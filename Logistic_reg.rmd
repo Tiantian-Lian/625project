@@ -1,0 +1,71 @@
+*(0) Install the packages.*
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+# install.packages("tidyverse")
+# install.packages("caret")
+# install.packages("pROC")
+install.packages("future")
+library(tidyverse)
+library(caret)
+library(pROC)
+```
+
+*(1)*
+```{r}
+df = read.csv("diabetes_binary_5050split_health_indicators_BRFSS2015.csv")
+# summary(df)
+
+df$Diabetes_binary = factor(df$Diabetes_binary,
+                            levels = c(0,1),
+                            labels = c("NoDiabetes", "Diabetes"))
+# summary(df)
+
+set.seed(123)
+
+# 70% as train
+train_index = createDataPartition(df$Diabetes_binary, p = 0.70, list = FALSE)
+train_data  = df[train_index, ]
+temp_data   = df[-train_index, ]   # 剩下 30%
+
+# 剩下的 30% 分成 20% validation + 10% test
+set.seed(123)
+valid_index = createDataPartition(temp_data$Diabetes_binary, p = 2/3, list = FALSE)
+valid_data  = temp_data[valid_index, ]
+test_data   = temp_data[-valid_index, ]
+
+n_total = nrow(df)
+cat("train % =", nrow(train_data) / n_total, "\n")
+cat("valid % =", nrow(valid_data) / n_total, "\n")
+cat("test  % =", nrow(test_data) / n_total, "\n")
+
+# logistic regression
+logit_model = glm(
+  Diabetes_binary ~ .,
+  data = train_data,
+  family = binomial
+)
+
+summary(logit_model)
+
+# validation 预测
+valid_prob = predict(logit_model, newdata = valid_data, type = "response")
+valid_pred = ifelse(valid_prob >= 0.5, "Diabetes", "NoDiabetes")
+valid_pred = factor(valid_pred, levels = levels(valid_data$Diabetes_binary))
+
+confusionMatrix(valid_pred, valid_data$Diabetes_binary)
+
+# test 评估
+test_prob = predict(logit_model, newdata = test_data, type = "response")
+test_pred = ifelse(test_prob >= 0.5, "Diabetes", "NoDiabetes")
+test_pred = factor(test_pred, levels = levels(test_data$Diabetes_binary))
+
+confusionMatrix(test_pred, test_data$Diabetes_binary)
+
+# ROC + AUC
+test_y = as.numeric(test_data$Diabetes_binary == "Diabetes")
+
+roc_obj = roc(test_y, test_prob)
+auc(roc_obj)
+plot(roc_obj, main = "ROC Curve (70/20/10 Split)")
+
+```

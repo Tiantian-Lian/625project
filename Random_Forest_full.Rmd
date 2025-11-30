@@ -1,0 +1,199 @@
+---
+title: "Random Forest full"
+author: "Meiqi Zhu"
+date: "2025-11-13"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+library(randomForest)
+library(caret)
+library(dplyr)
+library(pROC)
+library(ggplot2)
+```
+
+```{r}
+data <- read.csv("D:/Users/Desktop/BIOSTAT 625/Final_project/Data Base/diabetes/diabetes_binary_5050split.csv")
+```
+
+```{r}
+head(data)
+summary(data)
+```
+```{r}
+set.seed(123)
+
+data_clean <- data %>%
+  mutate(
+    Diabetes_binary = as.factor(Diabetes_binary),
+    HighBP = as.factor(HighBP),
+    HighChol = as.factor(HighChol),
+    CholCheck = as.factor(CholCheck),
+    Smoker = as.factor(Smoker),
+    Stroke = as.factor(Stroke),
+    HeartDiseaseorAttack = as.factor(HeartDiseaseorAttack),
+    PhysActivity = as.factor(PhysActivity),
+    Fruits = as.factor(Fruits),
+    Veggies = as.factor(Veggies),
+    HvyAlcoholConsump = as.factor(HvyAlcoholConsump),
+    AnyHealthcare = as.factor(AnyHealthcare),
+    NoDocbcCost = as.factor(NoDocbcCost),
+    DiffWalk = as.factor(DiffWalk),
+    Sex = as.factor(Sex)
+  )
+
+sum(is.na(data_clean))
+
+# Split data into 70% training and 30% testing
+train_index <- createDataPartition(data_clean$Diabetes_binary, 
+                                  p = 0.7, 
+                                  list = FALSE)
+train_data <- data_clean[train_index, ]
+test_data <- data_clean[-train_index, ]
+
+cat("Training set size:", nrow(train_data), "\n")
+cat("Testing set size:", nrow(test_data), "\n")
+cat("Training set proportion:", mean(train_data$Diabetes_binary == "1"), "\n")
+cat("Testing set proportion:", mean(test_data$Diabetes_binary == "1"), "\n")
+
+rf_model <- randomForest(
+  Diabetes_binary ~ .,
+  data = train_data,
+  ntree = 500,           # Number of trees
+  mtry = sqrt(ncol(train_data) - 1),  # Features per split
+  importance = TRUE,     # Calculate variable importance
+  proximity = FALSE
+)
+
+print(rf_model)
+
+rf_predictions <- predict(rf_model, test_data)
+rf_probabilities <- predict(rf_model, test_data, type = "prob")[,2]
+
+# confusion matrix
+conf_matrix <- confusionMatrix(rf_predictions, test_data$Diabetes_binary, positive = "1")
+print(conf_matrix)
+
+accuracy <- conf_matrix$overall['Accuracy']
+precision <- conf_matrix$byClass['Precision']
+recall <- conf_matrix$byClass['Recall']
+f1_score <- conf_matrix$byClass['F1']
+
+cat("\nModel Performance Metrics:\n")
+cat("Accuracy:", round(accuracy, 4), "\n")
+cat("Precision:", round(precision, 4), "\n")
+cat("Recall:", round(recall, 4), "\n")
+cat("F1-Score:", round(f1_score, 4), "\n")
+
+# ROC Curve and AUC
+roc_result <- roc(test_data$Diabetes_binary, rf_probabilities)
+auc_value <- auc(roc_result)
+
+cat("AUC:", round(auc_value, 4), "\n")
+plot(roc_result, main = "ROC Curve - Random Forest")
+legend("bottomright", legend = paste("AUC =", round(auc_value, 4)))
+
+var_importance <- importance(rf_model)
+varImpPlot(rf_model, 
+           main = "Variable Importance - Random Forest",
+           type = 2)  # Mean decrease in Gini
+
+var_imp_df <- data.frame(
+  Variable = rownames(var_importance),
+  Importance = var_importance[, "MeanDecreaseGini"]
+) %>%
+  arrange(desc(Importance))
+
+ggplot(var_imp_df[1:15, ], aes(x = reorder(Variable, Importance), y = Importance)) +
+  geom_col(fill = "steelblue") +
+  coord_flip() +
+  labs(title = "Top 15 Most Important Variables - Random Forest",
+       x = "Variables",
+       y = "Mean Decrease in Gini") +
+  theme_minimal()
+
+important_vars <- var_imp_df[1:10, c("Variable", "Importance")]
+print(important_vars)
+
+tune_result <- tuneRF(
+  x = train_data[, -1],  # All columns except Diabetes_binary
+  y = train_data$Diabetes_binary,
+  ntreeTry = 500,
+  stepFactor = 1.5,
+  improve = 0.01,
+  trace = TRUE,
+  plot = TRUE
+)
+
+if (length(tune_result) > 0) {
+  best_mtry <- tune_result[tune_result[, 2] == min(tune_result[, 2]), 1]
+  cat("Best mtry:", best_mtry, "\n")
+  
+  # Train final model with tuned parameters
+  rf_model_tuned <- randomForest(
+    Diabetes_binary ~ .,
+    data = train_data,
+    ntree = 500,
+    mtry = best_mtry,
+    importance = TRUE
+  )
+  
+  rf_predictions_tuned <- predict(rf_model_tuned, test_data)
+  conf_matrix_tuned <- confusionMatrix(rf_predictions_tuned, test_data$Diabetes_binary, positive = "1")
+  
+  cat("\nTuned Model Performance:\n")
+  cat("Accuracy:", round(conf_matrix_tuned$overall['Accuracy'], 4), "\n")
+  cat("Precision:", round(conf_matrix_tuned$byClass['Precision'], 4), "\n")
+  cat("Recall:", round(conf_matrix_tuned$byClass['Recall'], 4), "\n")
+  cat("F1-Score:", round(conf_matrix_tuned$byClass['F1'], 4), "\n")
+  
+  par(mfrow = c(1, 2))
+  varImpPlot(rf_model, main = "Original RF - Variable Importance")
+  varImpPlot(rf_model_tuned, main = "Tuned RF - Variable Importance")
+  
+  par(mfrow = c(1, 1))
+  
+  final_model <- rf_model_tuned
+} else {
+  cat("Tuning did not improve model. Using original model.\n")
+  final_model <- rf_model
+}
+
+rf_results <- list(
+  model = final_model,
+  accuracy = if(exists("conf_matrix_tuned")) conf_matrix_tuned$overall['Accuracy'] else accuracy,
+  precision = if(exists("conf_matrix_tuned")) conf_matrix_tuned$byClass['Precision'] else precision,
+  recall = if(exists("conf_matrix_tuned")) conf_matrix_tuned$byClass['Recall'] else recall,
+  f1_score = if(exists("conf_matrix_tuned")) conf_matrix_tuned$byClass['F1'] else f1_score,
+  auc = auc_value,
+  important_variables = important_vars
+)
+
+cat("\n=== RANDOM FOREST FINAL RESULTS ===\n")
+cat("Best Model Accuracy:", round(rf_results$accuracy, 4), "\n")
+cat("Precision:", round(rf_results$precision, 4), "\n")
+cat("Recall:", round(rf_results$recall, 4), "\n")
+cat("F1-Score:", round(rf_results$f1_score, 4), "\n")
+cat("AUC:", round(rf_results$auc, 4), "\n")
+cat("\nTop 5 Most Important Variables:\n")
+print(head(rf_results$important_variables, 5))
+
+write.csv(rf_results$important_variables, "random_forest_important_variables.csv", row.names = FALSE)
+
+results_table <- data.frame(
+  Metric = c("Accuracy", "Precision", "Recall", "F1-Score", "AUC"),
+  Value = c(
+    round(rf_results$accuracy, 4),
+    round(rf_results$precision, 4),
+    round(rf_results$recall, 4),
+    round(rf_results$f1_score, 4),
+    round(rf_results$auc, 4)
+  )
+)
+
+print(results_table)
+```
+
