@@ -1,5 +1,5 @@
 ---
-title: "final project test"
+title: "Random Forest full"
 author: "Meiqi Zhu"
 date: "2025-11-13"
 output:
@@ -26,7 +26,6 @@ summary(data)
 ```{r}
 set.seed(123)
 
-# Data preparation
 data_clean <- data %>%
   mutate(
     Diabetes_binary = as.factor(Diabetes_binary),
@@ -102,14 +101,12 @@ varImpPlot(rf_model,
            main = "Variable Importance - Random Forest",
            type = 2)  # Mean decrease in Gini
 
-# Convert to data frame for better visualization
 var_imp_df <- data.frame(
   Variable = rownames(var_importance),
   Importance = var_importance[, "MeanDecreaseGini"]
 ) %>%
   arrange(desc(Importance))
 
-# Plot variable importance using ggplot
 ggplot(var_imp_df[1:15, ], aes(x = reorder(Variable, Importance), y = Importance)) +
   geom_col(fill = "steelblue") +
   coord_flip() +
