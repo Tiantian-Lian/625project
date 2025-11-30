@@ -1,0 +1,142 @@
+---
+title: "Group Final Project"
+author: "Tiantian Lian"
+date: "2025-11-30"
+output: html_document
+---
+
+```{r}
+# install.packages("caret")
+# install.packages("xgboost")
+# install.packages("PRROC")
+# install.packages("pROC")
+
+library(tidyverse)
+library(caret)
+library(xgboost)
+library(pROC)
+library(PRROC)
+
+set.seed(625)
+
+# 读入数据
+dat <- read.csv("diabetes_binary_5050split_health_indicators_BRFSS2015.csv")
+
+# 把 outcome 设为 factor
+dat$Diabetes_binary <- factor(dat$Diabetes_binary,
+                              levels = c(0, 1),
+                              labels = c("NoDiab", "Diab"))
+str(dat$Diabetes_binary)
+
+
+set.seed(625)
+train_idx <- createDataPartition(dat$Diabetes_binary, p = 0.7, list = FALSE)
+train <- dat[train_idx, ]
+test  <- dat[-train_idx, ]
+
+# X / y for later use (matrix for xgboost)
+x_train <- as.matrix(select(train, -Diabetes_binary))
+y_train <- train$Diabetes_binary
+
+x_test  <- as.matrix(select(test, -Diabetes_binary))
+y_test  <- test$Diabetes_binary
+
+# For xgboost (numeric labels 0/1)
+y_train_num <- ifelse(y_train == "Diab", 1, 0)
+y_test_num  <- ifelse(y_test == "Diab", 1, 0)
+
+
+```
+
+**XGBoost**
+
+```{r}
+dtrain <- xgb.DMatrix(data = x_train, label = y_train_num)
+dtest  <- xgb.DMatrix(data = x_test, label = y_test_num)
+
+params <- list(
+  objective = "binary:logistic",
+  eval_metric = "auc",
+  max_depth = 4,
+  eta = 0.1,
+  subsample = 0.8,
+  colsample_bytree = 0.8
+)
+
+xgb_fit <- xgb.train(
+  params = params,
+  data = dtrain,
+  nrounds = 200,
+  watchlist = list(train = dtrain),
+  verbose = 0
+)
+
+xgb_prob <- predict(xgb_fit, newdata = dtest)
+xgb_pred <- ifelse(xgb_prob > 0.5, 1, 0) %>% factor(levels = c(0, 1),
+                                                    labels = c("NoDiab", "Diab"))
+
+confusionMatrix(xgb_pred, y_test, positive = "Diab")
+
+# XGB feature importance
+importance_matrix <- xgb.importance(model = xgb_fit)
+xgb.plot.importance(importance_matrix)
+
+```
+**ROC & PR 曲线对比**
+```{r}
+# ROC
+roc_glm <- roc(response = y_test, predictor = glm_prob, levels = c("NoDiab", "Diab"))
+roc_rf  <- roc(response = y_test, predictor = rf_prob,  levels = c("NoDiab", "Diab"))
+roc_xgb <- roc(response = y_test, predictor = xgb_prob, levels = c("NoDiab", "Diab"))
+
+plot(roc_glm, print.auc = TRUE, main = "ROC Curves - Test Set")
+lines(roc_rf, col = "red")
+lines(roc_xgb, col = "blue")
+legend("bottomright", legend = c("Logistic", "RF", "XGBoost"),
+       col = c("black", "red", "blue"), lty = 1)
+
+# PR curve（用正类=1 的分数和标签）
+pr_glm <- pr.curve(scores.class0 = glm_prob[y_test_num == 1],
+                   scores.class1 = glm_prob[y_test_num == 0],
+                   curve = TRUE)
+pr_rf  <- pr.curve(scores.class0 = rf_prob[y_test_num == 1],
+                   scores.class1 = rf_prob[y_test_num == 0],
+                   curve = TRUE)
+pr_xgb <- pr.curve(scores.class0 = xgb_prob[y_test_num == 1],
+                   scores.class1 = xgb_prob[y_test_num == 0],
+                   curve = TRUE)
+# 你可以把 pr_glm$curve 等整理成一个 data frame 用 ggplot 画
+
+```
+
+**Calibration plot（以 logistic 为例，RF/XGB 类似）**
+```{r}
+calib_df <- data.frame(
+  prob = glm_prob,
+  y    = ifelse(y_test == "Diab", 1, 0)
+)
+
+calib_df <- calib_df %>%
+  mutate(bin = cut(prob, breaks = seq(0, 1, by = 0.1), include.lowest = TRUE))
+
+calib_summary <- calib_df %>%
+  group_by(bin) %>%
+  summarise(
+    mean_prob = mean(prob),
+    obs_rate  = mean(y),
+    .groups = "drop"
+  )
+
+ggplot(calib_summary, aes(x = mean_prob, y = obs_rate)) +
+  geom_point() +
+  geom_line() +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed") +
+  xlab("Mean predicted probability") +
+  ylab("Observed diabetes proportion") +
+  ggtitle("Calibration Plot - Logistic Regression")
+
+```
+
+
+
+
