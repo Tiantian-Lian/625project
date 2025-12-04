@@ -3,8 +3,8 @@ title: "Random Forest full"
 author: "Meiqi Zhu"
 date: "2025-11-13"
 output:
-  pdf_document: default
   html_document: default
+  pdf_document: default
 ---
 
 ```{r setup, include=FALSE}
