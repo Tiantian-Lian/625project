@@ -1,0 +1,249 @@
+---
+title: "Final"
+author: "Group7"
+date: "2025-11-30"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+library(randomForest)
+library(caret)
+library(dplyr)
+library(pROC)
+library(ggplot2)
+library(MASS)
+```
+
+```{r}
+df = read.csv("diabetes_binary_5050split_health_indicators_BRFSS2015.csv")
+# summary(df)
+
+df$Diabetes_binary = factor(df$Diabetes_binary,
+                            levels = c(0,1),
+                            labels = c("NoDiabetes", "Diabetes"))
+# summary(df)
+
+set.seed(123)
+
+# 70% as train, 30% as test
+train_index = createDataPartition(df$Diabetes_binary, p = 0.70, list = FALSE)
+train_data  = df[train_index, ]
+test_data   = df[-train_index, ]
+
+n_total = nrow(df)
+cat("Training set size:", nrow(train_data), "\n")
+cat("Testing set size:", nrow(test_data), "\n")
+cat("train % =", nrow(train_data) / n_total, "\n")
+cat("test  % =", nrow(test_data) / n_total, "\n")
+
+# ==========================================================================
+# Logistic Regression
+# ==========================================================================
+
+# 5-fold cross-validation on training data
+
+set.seed(123)
+folds = createFolds(train_data$Diabetes_binary, k = 5, returnTrain = FALSE)
+
+cv_full   = data.frame(fold = 1:5, Accuracy = NA, AUC = NA)
+cv_red    = data.frame(fold = 1:5, Accuracy = NA, AUC = NA)
+
+for (i in 1:5) {
+  idx_valid = folds[[i]]
+  cv_train  = train_data[-idx_valid, ]
+  cv_valid  = train_data[idx_valid, ]
+
+  # full model
+  fit_full = glm(
+    Diabetes_binary ~ .,
+    data   = cv_train,
+    family = binomial
+  )
+
+  prob_full = predict(fit_full, newdata = cv_valid, type = "response")
+  pred_full = ifelse(prob_full >= 0.5, "Diabetes", "NoDiabetes")
+  pred_full = factor(pred_full, levels = levels(train_data$Diabetes_binary))
+
+  cm_full   = confusionMatrix(pred_full, cv_valid$Diabetes_binary)
+  cv_full$Accuracy[i] = cm_full$overall["Accuracy"]
+
+  roc_full  = roc(as.numeric(cv_valid$Diabetes_binary == "Diabetes"), prob_full)
+  cv_full$AUC[i] = as.numeric(auc(roc_full))
+
+  # reduced model 
+  fit_red = glm(
+    Diabetes_binary ~ HighBP + HighChol + CholCheck + BMI +
+      Stroke + HeartDiseaseorAttack + HvyAlcoholConsump +
+      GenHlth + MentHlth + PhysHlth + DiffWalk +
+      Sex + Age + Education + Income,
+    data   = cv_train,
+    family = binomial
+  )
+
+  prob_red = predict(fit_red, newdata = cv_valid, type = "response")
+  pred_red = ifelse(prob_red >= 0.5, "Diabetes", "NoDiabetes")
+  pred_red = factor(pred_red, levels = levels(train_data$Diabetes_binary))
+
+  cm_red   = confusionMatrix(pred_red, cv_valid$Diabetes_binary)
+  cv_red$Accuracy[i] = cm_red$overall["Accuracy"]
+
+  roc_red  = roc(as.numeric(cv_valid$Diabetes_binary == "Diabetes"), prob_red)
+  cv_red$AUC[i] = as.numeric(auc(roc_red))
+}
+
+# 5-fold CV average result
+colMeans(cv_full[, c("Accuracy", "AUC")])
+colMeans(cv_red[,  c("Accuracy", "AUC")])
+
+# fit the model on entire train_data
+
+# full model
+logit_model = glm(
+  Diabetes_binary ~ .,
+  data   = train_data,
+  family = binomial
+)
+summary(logit_model)
+
+# reduced model
+reduced_model = glm(
+  Diabetes_binary ~ HighBP + HighChol + CholCheck + BMI +
+    Stroke + HeartDiseaseorAttack + HvyAlcoholConsump +
+    GenHlth + MentHlth + PhysHlth + DiffWalk +
+    Sex + Age + Education + Income,
+  data   = train_data,
+  family = binomial
+)
+summary(reduced_model)
+
+# test set prediction（full + reduced）
+
+# full model on test
+test_prob_full = predict(logit_model, newdata = test_data, type = "response")
+test_pred_full = ifelse(test_prob_full >= 0.5, "Diabetes", "NoDiabetes")
+test_pred_full = factor(test_pred_full, levels = levels(test_data$Diabetes_binary))
+
+cm_test_full = confusionMatrix(test_pred_full, test_data$Diabetes_binary)
+cm_test_full
+
+# reduced model on test
+test_prob_red = predict(reduced_model, newdata = test_data, type = "response")
+test_pred_red = ifelse(test_prob_red >= 0.5, "Diabetes", "NoDiabetes")
+test_pred_red = factor(test_pred_red, levels = levels(test_data$Diabetes_binary))
+
+cm_test_red = confusionMatrix(test_pred_red, test_data$Diabetes_binary)
+cm_test_red
+
+# ROC + AUC（test set）
+
+test_y = as.numeric(test_data$Diabetes_binary == "Diabetes")
+
+roc_full_test = roc(test_y, test_prob_full)
+roc_red_test  = roc(test_y, test_prob_red)
+
+auc_full_test = auc(roc_full_test)
+auc_red_test  = auc(roc_red_test)
+
+auc_full_test
+auc_red_test
+
+# plot ROC curve
+plot(roc_red_test, col = "blue", main = "ROC Comparison on Test Set (70/30 Split)")
+plot(roc_full_test, col = "red", add = TRUE)
+legend("bottomright",
+       legend = c("Reduced model", "Full model"),
+       col    = c("blue", "red"),
+       lwd    = 2)
+
+# Likelihood Ratio Test (Nested Model Comparison)
+anova(reduced_model, logit_model, test = "Chisq")
+
+# Additional Model Selection Metrics: PRESS, Cp, AIC, BIC
+# PRESS (Prediction Error Sum of Squares)
+calc_press = function(model) {
+  h = hatvalues(model)
+  r = residuals(model)
+  press = sum((r / (1 - h))^2)
+  return(press)
+}
+
+PRESS_full = calc_press(logit_model)
+PRESS_red  = calc_press(reduced_model)
+
+cat("PRESS (full model):", PRESS_full, "\n")
+cat("PRESS (reduced model):", PRESS_red, "\n\n")
+
+
+# Mallows' Cp (use deviance as logistic RSS)
+RSS_full = logit_model$deviance
+RSS_red  = reduced_model$deviance
+
+n  = nrow(train_data)
+
+p_full = length(coef(logit_model))
+p_red  = length(coef(reduced_model))
+
+sigma2_full = RSS_full / (n - p_full)
+
+Cp_full = RSS_full / sigma2_full - (n - 2*p_full)
+Cp_red  = RSS_red  / sigma2_full - (n - 2*p_red)
+
+cat("Cp (full model):", Cp_full, "\n")
+cat("Cp (reduced model):", Cp_red, "\n\n")
+
+
+# AIC & BIC
+AIC_full = AIC(logit_model)
+BIC_full = BIC(logit_model)
+
+AIC_red = AIC(reduced_model)
+BIC_red = BIC(reduced_model)
+
+cat("AIC (full model):", AIC_full, "\n")
+cat("AIC (reduced model):", AIC_red, "\n\n")
+
+cat("BIC (full model):", BIC_full, "\n")
+cat("BIC (reduced model):", BIC_red, "\n\n")
+```
+
+#Random Forest
+```{r}
+set.seed(123)
+
+reduced_formula <- Diabetes_binary ~ HighBP + HighChol + CholCheck + BMI + Stroke +
+  HeartDiseaseorAttack + HvyAlcoholConsump + GenHlth + MentHlth + PhysHlth +
+  DiffWalk + Sex + Age + Education + Income
+
+rf_model_reduced <- randomForest(
+  reduced_formula,
+  data = train_data,
+  ntree = 500,
+  mtry = floor(sqrt(15)),  
+  importance = TRUE,
+  proximity = FALSE
+)
+
+print(rf_model_reduced)
+
+rf_predictions_reduced <- predict(rf_model_reduced, test_data)
+rf_probabilities_reduced <- predict(rf_model_reduced, test_data, type = "prob")[,2]
+
+# Confusion matrix
+conf_matrix_reduced <- confusionMatrix(rf_predictions_reduced, test_data$Diabetes_binary, positive = "1")
+print(conf_matrix_reduced)
+
+# Performance metrics
+accuracy_reduced <- conf_matrix_reduced$overall['Accuracy']
+precision_reduced <- conf_matrix_reduced$byClass['Precision']
+recall_reduced <- conf_matrix_reduced$byClass['Recall']
+f1_score_reduced <- conf_matrix_reduced$byClass['F1']
+```
+```{r}
+# ROC Curve 
+roc_result_reduced <- roc(test_data$Diabetes_binary, rf_probabilities_reduced)
+auc_value_reduced <- auc(roc_result_reduced)
+cat("AUC:", round(auc_value_reduced, 4), "\n")
+
+plot(roc_result_reduced, main = "ROC Curve - Reduced Random Forest", col = "blue")
+legend("bottomright", legend = paste("AUC =", round(auc_value_reduced, 4)), col = "blue", lty = 1)
+```

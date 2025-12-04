@@ -1,5 +1,5 @@
 ---
-title: "Group Final Project"
+title: "XGBoost"
 author: "Tiantian Lian"
 date: "2025-11-30"
 output: html_document
