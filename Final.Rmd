@@ -205,3 +205,45 @@ cat("AIC (reduced model):", AIC_red, "\n\n")
 cat("BIC (full model):", BIC_full, "\n")
 cat("BIC (reduced model):", BIC_red, "\n\n")
 ```
+
+#Random Forest
+```{r}
+set.seed(123)
+
+reduced_formula <- Diabetes_binary ~ HighBP + HighChol + CholCheck + BMI + Stroke +
+  HeartDiseaseorAttack + HvyAlcoholConsump + GenHlth + MentHlth + PhysHlth +
+  DiffWalk + Sex + Age + Education + Income
+
+rf_model_reduced <- randomForest(
+  reduced_formula,
+  data = train_data,
+  ntree = 500,
+  mtry = floor(sqrt(15)),  
+  importance = TRUE,
+  proximity = FALSE
+)
+
+print(rf_model_reduced)
+
+rf_predictions_reduced <- predict(rf_model_reduced, test_data)
+rf_probabilities_reduced <- predict(rf_model_reduced, test_data, type = "prob")[,2]
+
+# Confusion matrix
+conf_matrix_reduced <- confusionMatrix(rf_predictions_reduced, test_data$Diabetes_binary, positive = "1")
+print(conf_matrix_reduced)
+
+# Performance metrics
+accuracy_reduced <- conf_matrix_reduced$overall['Accuracy']
+precision_reduced <- conf_matrix_reduced$byClass['Precision']
+recall_reduced <- conf_matrix_reduced$byClass['Recall']
+f1_score_reduced <- conf_matrix_reduced$byClass['F1']
+```
+```{r}
+# ROC Curve 
+roc_result_reduced <- roc(test_data$Diabetes_binary, rf_probabilities_reduced)
+auc_value_reduced <- auc(roc_result_reduced)
+cat("AUC:", round(auc_value_reduced, 4), "\n")
+
+plot(roc_result_reduced, main = "ROC Curve - Reduced Random Forest", col = "blue")
+legend("bottomright", legend = paste("AUC =", round(auc_value_reduced, 4)), col = "blue", lty = 1)
+```
