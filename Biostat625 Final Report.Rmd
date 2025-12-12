@@ -1,0 +1,42 @@
+---
+title: 'Predictive Modeling of Diabetes and Prediabetes: A Comparative Study of Logistic
+  Regression, Random Forest, and XGBoost'
+author: 'Group7: Tiantian Lian, Meiqi Zhu, Shuchen Wu'
+date: "2025-12-9"
+output:
+  pdf_document: 
+    latex_engine: xelatex
+---
+
+# Abstract/Summary
+
+
+# Introduction Section 
+
+As the one of the most prevalent chronic diseases in the United States, diabetes is contributing to increased morbidity, mortality, and healthcare costs. Although there is no cure, the progression and complications of diabetes can often be mitigated through some behaviors like weight management, healthy diet, regular physical activity, and appropriate medical treatment. Crucially, these strategies are most effective when high risk individuals are identified early, before severe complications developed. Therefore, predictive models based om collected health information for diabetes risk can be valuable tools for public health officials and prevention efforts.
+
+The Behavioral Risk Factor Surveillance System (BRFSS), collected annually by the Centers for Disease Control and Prevention (CDC), is a health-related telephone survey.(that collects information on health behaviors, chronic conditions, and access to care in the adult population) For this project, we focus on a cleaned, balanced subset of the 2015 BRFSS data containing 70,692 respondents and a binary outcome indicating **no diabetes** versus **prediabetes or diabetes**, each class represents 50% of the sample.The dataset includes 21 predictors covering demographic characteristics (sex, age), socioeconomic indicators (education, income), lifestyle behaviors (smoking, physical activity, fruit consumption, vegetable consumption, heavy alcohol consumption), clinical conditions (high blood pressure, high cholesterol, stroke, heart disease, body mass index), healthcare access (health care coverage, cost-related barriers, cholesterol check), and self-reported health and functional status (general health, mental health,  physical health, difficulty walking).
+
+The primary interest of this project is to build and compare predictive performance of logistic regression, random forest, and XGBoost for diabetes risk prediction using BRFSS 2015 health indicators. We train all models on a training set and evaluate them on a test set using a common set of metrics, (including ROC AUC, precision–recall AUC, classification performance at a chosen probability threshold, and calibration of predicted risks.???) A secondary objective is to identify and interpret the top predictors in prediction: we use penalized logistic regression to derive a reduced logistic model and compare its performance with the full model, (and we assess the consistency of important predictors identified by logistic regression, random forest, and XGBoost???). Through this comparison, we aim to understand whether complex machine learning methods provide meaningful advantages over a simpler, interpretable logistic model for diabetes risk prediction in large scaled data.
+
+# Method Section
+- Train/ Test split, 5th fold 
+
+- Logistic Regression 
+  - Diagnostic
+- Random Forest
+- XGboost
+
+- 比较：
+- Workflow: 选出 Logistic Regression， 然后做model selection 减少predictors，再和原来的Logistic Regression full model比较
+- 遇到什么问题：Rcpp and parallel解决或者画图app？
+
+# Result Section
+# Conclusion Section
+# References
+
+ The contributions from each of the group member should be clearly stated (although all the
+students in a group will receive equal points for the final group project).
+ A public GitHub repository should be used for the group members to collaborate on the final
+project, with a link to it provided in the report.
+ Graphics (ideally with ggplot2) should be used to present the results
