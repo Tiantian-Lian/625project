@@ -1,5 +1,5 @@
 ---
-title: "Comparasion of Logistic Regression, Random Forest, and XGBoost with all predictors"
+title: "Comparison of Logistic Regression, Random Forest, and XGBoost with all predictors"
 author: "Group7"
 date: "2025-11-30"
 output: pdf_document
@@ -51,8 +51,6 @@ y_test <- ifelse(test_data$Diabetes_binary == "Diabetes", 1, 0)
 
 # 2. Logistic Regression
 ```{r}
-# 5-fold cross-validation on training data
-
 set.seed(123)
 folds = createFolds(train_data$Diabetes_binary, k = 5, returnTrain = FALSE)
 
@@ -125,7 +123,6 @@ legend("bottomright",
 ```{r}
 library(pROC)
 
-# full formula with all 21 predictors
 full_formula <- Diabetes_binary ~ HighBP + HighChol + CholCheck + BMI + Smoker +
   Stroke + HeartDiseaseorAttack + PhysActivity + Fruits + Veggies +
   HvyAlcoholConsump + AnyHealthcare + NoDocbcCost + GenHlth +
@@ -188,11 +185,10 @@ legend("bottomright",
 
 
 ```
-## 4. XGBoost 
+# 4. XGBoost 
 ```{r}
 library(xgboost)
 
-# 把 outcome 变成 0/1
 y_train <- ifelse(train_data$Diabetes_binary == "Diabetes", 1, 0)
 y_test  <- ifelse(test_data$Diabetes_binary  == "Diabetes", 1, 0)
 
@@ -240,7 +236,7 @@ xgb_fit <- xgb.train(
 )
 
 # test set prediction
-xgb_prob <- predict(xgb_fit, newdata = dtest)  # 0~1
+xgb_prob <- predict(xgb_fit, newdata = dtest) 
 
 roc_xgb_test <- roc(y_test, xgb_prob)
 auc_xgb_test <- auc(roc_xgb_test)
@@ -252,28 +248,19 @@ legend("bottomright",
        col = "darkgreen", lwd = 2)
 ```
 
-** Comparisons between Logistic Regression, Random Forst and XGBoost **
-**ROC AUC、Accuracy **
-**F1、Sensitivity、Specificity **
-**PR AUC、Brier score **
-**Calibration plots**
+# 5. Comparisons between Logistic Regression, Random Forst and XGBoost 
+
+## 5.1. ROC AUC, Accuracy, Sensitivity, Specificity, Brier score 
 
 ```{r}
-## ===== Unified evaluation for the three models =====
 
-# make sure we have a common 0/1 outcome on the test set
 y_test <- ifelse(test_data$Diabetes_binary == "Diabetes", 1, 0)
 
-# probabilities from each model (you already computed these above)
+# probabilities from each model 
 glm_prob_test <- test_prob_full         # logistic regression
 rf_prob_test  <- rf_test_prob           # random forest
 xgb_prob_test <- xgb_prob               # XGBoost
 
-## 1. A small helper to compute:
-##    - ROC AUC
-##    - Accuracy, Sensitivity, Specificity (threshold = 0.5)
-##    - Brier score
-##    - calibration data (for plotting)
 eval_binary <- function(prob, y_true01, threshold = 0.5) {
   # ROC / AUC
   roc_obj <- roc(response = y_true01, predictor = prob)
@@ -290,7 +277,7 @@ eval_binary <- function(prob, y_true01, threshold = 0.5) {
   
   cm <- confusionMatrix(pred_label, ref, positive = "Diabetes")
   
-  # calibration data (10 bins)
+  # calibration data 
   calib_df <- data.frame(prob = prob, y = y_true01) |>
     dplyr::mutate(
       bin = cut(prob, breaks = seq(0, 1, by = 0.1), include.lowest = TRUE)
@@ -312,15 +299,10 @@ eval_binary <- function(prob, y_true01, threshold = 0.5) {
   )
 }
 
-## 2. Evaluate the three models on the SAME test set
 res_glm <- eval_binary(glm_prob_test, y_test)
 res_rf  <- eval_binary(rf_prob_test,  y_test)
 res_xgb <- eval_binary(xgb_prob_test, y_test)
 
-## 3. Put key metrics in one comparison table:
-##    - ROC AUC (main)
-##    - Accuracy, Sensitivity, Specificity
-##    - Brier score
 perf <- tibble(
   Model       = c("Logistic regression", "Random forest", "XGBoost"),
   AUC_ROC     = c(res_glm$AUC_ROC, res_rf$AUC_ROC, res_xgb$AUC_ROC),
@@ -339,12 +321,10 @@ perf <- tibble(
 perf
 
 ```
-
+## 5.2. Calibration plots for the three models (test set)
 
 
 ```{r}
-# Calibration plots for the three models (test set)
-
 calib_glm <- res_glm$calib
 calib_rf  <- res_rf$calib
 calib_xgb <- res_xgb$calib
