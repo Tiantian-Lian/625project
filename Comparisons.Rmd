@@ -253,7 +253,7 @@ legend("bottomright",
 ```
 
 ## 5. Comparisons between Logistic Regression, Random Forst and XGBoost 
-###ROC AUC, Accuracy, Sensitivity, Specificity, Brier score 
+### ROC AUC, Accuracy, Sensitivity, Specificity, Brier score 
 
 ```{r}
 
