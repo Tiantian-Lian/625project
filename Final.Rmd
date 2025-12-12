@@ -208,42 +208,102 @@ cat("BIC (reduced model):", BIC_red, "\n\n")
 
 #Random Forest
 ```{r}
+library(pROC)
+
 set.seed(123)
+folds_rf <- createFolds(train_data$Diabetes_binary, k = 5, returnTrain = FALSE)
 
-reduced_formula <- Diabetes_binary ~ HighBP + HighChol + CholCheck + BMI + Stroke +
-  HeartDiseaseorAttack + HvyAlcoholConsump + GenHlth + MentHlth + PhysHlth +
-  DiffWalk + Sex + Age + Education + Income
+roc_list <- list()
 
-rf_model_reduced <- randomForest(
+for (i in 1:5) {
+  idx_valid <- folds_rf[[i]]
+  cv_train  <- train_data[-idx_valid, ]
+  cv_valid  <- train_data[idx_valid, ]
+  
+  rf_model <- randomForest(
+    reduced_formula,
+    data = cv_train,
+    ntree = 500,
+    mtry = floor(sqrt(15)),
+    importance = TRUE
+  )
+  
+  rf_prob <- predict(rf_model, cv_valid, type = "prob")[, "Diabetes"]
+  
+  # Store ROC object
+  roc_list[[i]] <- roc(cv_valid$Diabetes_binary, rf_prob)
+}
+
+# Plot all ROC curves together
+plot(roc_list[[1]], col = "red", main = "ROC Curves - 5-Fold CV (Random Forest)")
+for (i in 2:5) {
+  plot(roc_list[[i]], col = i, add = TRUE)
+}
+
+legend("bottomright",
+       legend = paste("Fold", 1:5, "AUC =", round(sapply(roc_list, auc), 3)),
+       col = 1:5,
+       lwd = 2)
+
+# Average ROC curve (pooled predictions across folds)
+all_probs <- unlist(lapply(1:5, function(i) predict(
+  randomForest(reduced_formula, data = train_data[-folds_rf[[i]], ], ntree = 500, mtry = floor(sqrt(15))),
+  train_data[folds_rf[[i]], ], type = "prob")[, "Diabetes"]
+))
+all_labels <- unlist(lapply(1:5, function(i) train_data[folds_rf[[i]], "Diabetes_binary"]))
+
+roc_avg <- roc(all_labels, all_probs)
+plot(roc_avg, col = "black", lwd = 3, add = TRUE)
+legend("bottomleft", legend = paste("Average ROC (AUC =", round(auc(roc_avg), 3), ")"),
+       col = "black", lwd = 3)
+
+```
+
+
+```{r}
+cv_summary <- colMeans(cv_rf[, c("Accuracy","Precision","Recall","F1","AUC")])
+print(cv_summary)
+
+# Evaluate on the test set (final model) 
+# Fit RF on full training data
+rf_final <- randomForest(
   reduced_formula,
   data = train_data,
   ntree = 500,
-  mtry = floor(sqrt(15)),  
-  importance = TRUE,
-  proximity = FALSE
+  mtry = floor(sqrt(15)),
+  importance = TRUE
 )
 
-print(rf_model_reduced)
+# Predictions on test set
+rf_test_pred <- predict(rf_final, test_data)
+rf_test_pred <- factor(rf_test_pred, levels = c("NoDiabetes","Diabetes"))
+rf_test_prob <- predict(rf_final, test_data, type = "prob")[, "Diabetes"]
 
-rf_predictions_reduced <- predict(rf_model_reduced, test_data)
-rf_probabilities_reduced <- predict(rf_model_reduced, test_data, type = "prob")[,2]
+# Confusion matrix on test set
+cm_test <- confusionMatrix(rf_test_pred, test_data$Diabetes_binary, positive = "Diabetes")
+print(cm_test)
 
-# Confusion matrix
-conf_matrix_reduced <- confusionMatrix(rf_predictions_reduced, test_data$Diabetes_binary, positive = "1")
-print(conf_matrix_reduced)
+# Extract performance metrics
+test_accuracy  <- cm_test$overall["Accuracy"]
+test_precision <- cm_test$byClass["Precision"]
+test_recall    <- cm_test$byClass["Recall"]
+test_f1        <- cm_test$byClass["F1"]
 
-# Performance metrics
-accuracy_reduced <- conf_matrix_reduced$overall['Accuracy']
-precision_reduced <- conf_matrix_reduced$byClass['Precision']
-recall_reduced <- conf_matrix_reduced$byClass['Recall']
-f1_score_reduced <- conf_matrix_reduced$byClass['F1']
+# ROC/AUC on test set
+roc_test <- roc(test_data$Diabetes_binary, rf_test_prob)
+test_auc <- auc(roc_test)
+
+# Combine CV and Test results for comparison 
+results_compare <- data.frame(
+  Metric    = c("Accuracy","Precision","Recall","F1","AUC"),
+  CV_Avg    = round(cv_summary, 3),
+  Test_Set  = round(c(test_accuracy, test_precision, test_recall, test_f1, test_auc), 3)
+)
+
+print(results_compare)
+
+plot(roc_test, col = "blue", main = "Random Forest ROC - Test Set")
+legend("bottomright", legend = paste("AUC =", round(test_auc, 3)), col = "blue", lwd = 2)
+
 ```
-```{r}
-# ROC Curve 
-roc_result_reduced <- roc(test_data$Diabetes_binary, rf_probabilities_reduced)
-auc_value_reduced <- auc(roc_result_reduced)
-cat("AUC:", round(auc_value_reduced, 4), "\n")
 
-plot(roc_result_reduced, main = "ROC Curve - Reduced Random Forest", col = "blue")
-legend("bottomright", legend = paste("AUC =", round(auc_value_reduced, 4)), col = "blue", lty = 1)
-```
