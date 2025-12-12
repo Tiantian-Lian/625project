@@ -13,11 +13,9 @@ output:
 
 # Introduction Section 
 
-As the one of the most prevalent chronic diseases in the United States, diabetes is contributing to increased morbidity, mortality, and healthcare costs. Although there is no cure, the progression and complications of diabetes can often be mitigated through some behaviors like weight management, healthy diet, regular physical activity, and appropriate medical treatment. Crucially, these strategies are most effective when high risk individuals are identified early, before severe complications developed. Therefore, predictive models based om collected health information for diabetes risk can be valuable tools for public health officials and prevention efforts.
+As the one of the most prevalent chronic diseases in the United States, diabetes is contributing to increased morbidity and healthcare costs. Although there is no cure, the progression of diabetes can often be mitigated when high risk individuals are identified before severe complications developed. Therefore, predictive models based on collected health information can be valuable tools for public health officials and prevention efforts. 
 
-The Behavioral Risk Factor Surveillance System (BRFSS), collected annually by the Centers for Disease Control and Prevention (CDC), is a health-related telephone survey.(that collects information on health behaviors, chronic conditions, and access to care in the adult population) For this project, we focus on a cleaned, balanced subset of the 2015 BRFSS data containing 70,692 respondents and a binary outcome indicating **no diabetes** versus **prediabetes or diabetes**, each class represents 50% of the sample.The dataset includes 21 predictors covering demographic characteristics (sex, age), socioeconomic indicators (education, income), lifestyle behaviors (smoking, physical activity, fruit consumption, vegetable consumption, heavy alcohol consumption), clinical conditions (high blood pressure, high cholesterol, stroke, heart disease, body mass index), healthcare access (health care coverage, cost-related barriers, cholesterol check), and self-reported health and functional status (general health, mental health,  physical health, difficulty walking).
-
-The primary interest of this project is to build and compare predictive performance of logistic regression, random forest, and XGBoost for diabetes risk prediction using BRFSS 2015 health indicators. We train all models on a training set and evaluate them on a test set using a common set of metrics, (including ROC AUC, precision–recall AUC, classification performance at a chosen probability threshold, and calibration of predicted risks.???) A secondary objective is to identify and interpret the top predictors in prediction: we use penalized logistic regression to derive a reduced logistic model and compare its performance with the full model, (and we assess the consistency of important predictors identified by logistic regression, random forest, and XGBoost???). Through this comparison, we aim to understand whether complex machine learning methods provide meaningful advantages over a simpler, interpretable logistic model for diabetes risk prediction in large scaled data.
+The Behavioral Risk Factor Surveillance System (BRFSS), administered annually by the Centers for Disease Control and Prevention (CDC), is a health-related telephone survey. For this project, we use a cleaned, balanced 2015 BRFSS dataset with 70,692 respondents, a binary outcome (no diabetes vs. prediabetes/diabetes; 50% per class), and 21 predictors. This project describes the development and comparison of logistic regression, random forest, and XGBoost models for diabetes risk prediction. It aims to assess whether or not more complex machine learning methods provide meaningful advantages over a simpler, interpretable logistic regression model in this dataset.
 
 # Method Section
 
@@ -31,11 +29,11 @@ We applied this cross-validation process to compare different models and to sele
 
 - Logistic Regression 
 
-Logistic regression is a statistical method specifically designed to model and predict binary outcomes. Instead of directly predicting class labels, it estimates the probability that an observation belongs to the positive class, and these probabilities can then be converted into 0/1 predictions using a chosen threshold.
-  
-We selected logistic regression for our diabetes prediction project because it naturally fits the goal of predicting whether an individual has diabetes or not. The model directly outputs estimated diabetes risk, which makes the results easy to interpret and compare across individuals. In addition, logistic regression provides clear information about the direction and relative importance of each predictor, allowing us to understand how demographic, behavioral, and health-related variables contribute to diabetes risk.
+Logistic regression is a statistical method designed for predicting binary outcomes by estimating the probability that an observation belongs to the positive class, which can then be converted into a 0/1 prediction using a chosen threshold.
 
-Although logistic regression assumes a linear relationship between predictors and the log-odds of the outcome and therefore does not automatically capture complex non-linear patterns, this simplicity helps produce stable and transparent results. As a result, logistic regression serves as an interpretable baseline model that complements more flexible methods such as Random Forest and XGBoost.
+We selected logistic regression for this project because it directly models diabetes risk and provides clear, interpretable estimates of how each predictor is associated with the outcome. This interpretability makes logistic regression a useful baseline model for understanding the effects of demographic, behavioral, and health-related variables and for comparison with more flexible methods such as Random Forest and XGBoost.
+
+Although logistic regression does not automatically capture complex non-linear relationships, its simplicity leads to stable and transparent results, making it well suited as a reference model in our analysis.
 
   
 - Random Forest
@@ -69,53 +67,33 @@ After selecting logistic regression as our modeling approach, we performed model
 The full logistic regression model included all available demographic, behavioral, and health-related predictors in the BRFSS 2015 dataset. This model serves as a baseline with maximal flexibility but also the highest complexity.
 
 - Model Selection
-To obtain a more parsimonious model, stepwise model selection based on the Bayesian Information Criterion (BIC) was applied. Starting from the full model, predictors were iteratively added or removed using a bidirectional search, with the penalty term
-BIC penalty = log(n)
-where n is the number of training observations.
+
+  To obtain a more parsimonious model, stepwise model selection based on the Bayesian Information Criterion (BIC) was applied. Starting from the full model, predictors were iteratively added or removed using a bidirectional search, with the penalty term “BIC penalty = log(n)” where n is the number of training observations.
 The final reduced model selected by BIC retained the following predictors:
-Diabetes_binary ~ HighBP + HighChol + CholCheck + BMI + Stroke + 
+
+  Diabetes_binary ~ HighBP + HighChol + CholCheck + BMI + Stroke + 
     HeartDiseaseorAttack + HvyAlcoholConsump + GenHlth + PhysHlth + 
     DiffWalk + Sex + Age + Income
-This reduced model balances interpretability and predictive performance by excluding variables that do not provide sufficient information once model complexity is penalized.
+    
+  This reduced model balances interpretability and predictive performance by excluding variables that do not provide sufficient information once model complexity is penalized.
 
-To assess the stability of BIC-based selection, the stepwise procedure was repeated within each fold of a 5-fold cross-validation on the training data. Variables such as Age, BMI, GenHlth, HighBP, and HighChol appeared consistently across folds, indicating robust importance, while less stable variables were excluded in multiple folds.
-![Stepwise_CV_count](pic/Stepwise_CV_count.png){width=50%}
+  To assess the stability of BIC-based selection, the stepwise procedure was repeated within each fold of a 5-fold cross-validation on the training data. Variables such as Age, BMI, GenHlth, HighBP, and HighChol appeared consistently across folds, indicating robust importance, while less stable variables were excluded in multiple folds.
 
 - Model Comparison
-Cross-Validation Performance (Training Set): 
-Using 5-fold cross-validation on the training data, the full and reduced models exhibited nearly identical predictive performance:
-Accuracy: approximately 0.75 for both models
-AUC: approximately 0.82 for both models
-This suggests that removing predictors via BIC-based selection did not materially degrade predictive accuracy.
 
-Test Set Performance:
-Both models were refit on the entire training set and evaluated on the held-out test set. Results show:
-Accuracy:
-Full model ≈ 0.749
-Reduced (BIC) model ≈ 0.749
-AUC:
-Full model ≈ 0.827
-Reduced model ≈ 0.827
-The ROC curves for the two models are nearly indistinguishable, indicating equivalent discriminative ability.
-![ROC curve:full vs reduced model](pic/ROC_curve_full_reduced.png){width=50%}
+  - Cross-Validation Performance (Training Set): Using 5-fold cross-validation on the training data, the full and BIC-selected reduced models showed nearly identical predictive performance, with accuracy around 0.75 and AUC around 0.82 for both models. This indicates that BIC-based variable selection did not meaningfully reduce out-of-sample predictive performance.
 
-Likelihood Ratio Test:
-A likelihood ratio test comparing the reduced model to the full model yielded a statistically significant result (p < 0.05), suggesting that the full model provides a slightly better fit in terms of deviance. However, this improvement is not reflected in predictive performance, as accuracy and AUC remain unchanged.
-Given the large sample size, small differences in deviance can become statistically significant without being practically meaningful. Therefore, the reduced model is preferred due to its parsimony and interpretability.
+  - Test Set Performance: On the test set, the full and BIC-selected reduced models achieved nearly identical accuracy (≈ 0.75) and AUC (≈ 0.83), with almost overlapping ROC curves, indicating comparable discriminative performance despite the reduced model using fewer predictors.
 
-Diagnostic Analysis:
-Model diagnostics were conducted on the reduced (BIC-selected) model to assess adequacy and influence.
-![Deviance_residuals vs fitted_probabilities](pic/Deviance_residuals_fitted_probabilities.png){width=50%}
+  - Likelihood Ratio Test: A likelihood ratio test comparing the reduced and full models was statistically significant (p < 0.05), indicating a slightly better fit for the full model in terms of deviance. However, this improvement did not translate into better predictive performance, as accuracy and AUC remained essentially unchanged. Given the large sample size, this statistically significant difference is likely of limited practical importance, and the reduced model is therefore preferred for its parsimony and interpretability.
 
-Deviance residuals vs fitted probabilities showed no strong systematic pattern, suggesting an adequate model fit.
+- Diagnostic Analysis:
 
-Leverage (hat values) identified a small number of observations with higher leverage; however, their proportion was low relative to the sample size.
-Cook’s distance indicated that no single observation exerted undue influence on the fitted model.
-DFBETAs for key predictors such as BMI and Age were examined, and no widespread instability in coefficient estimates was observed.
-Overall, diagnostic results indicate that the reduced logistic regression model is stable and not overly influenced by a small subset of observations.
+  Model diagnostics were conducted on the reduced (BIC-selected) model to assess adequacy and influence. Deviance residuals vs fitted probabilities showed no strong systematic pattern, suggesting an adequate model fit. Leverage (hat values) identified a small number of observations with higher leverage; however, their proportion was low relative to the sample size. Cook’s distance indicated that no single observation exerted undue influence on the fitted model. DFBETAs for key predictors such as BMI and Age were examined, and no widespread instability in coefficient estimates was observed. Overall, diagnostic results indicate that the reduced logistic regression model is stable and not overly influenced by a small subset of observations.
 
 - Conclusion:
-In summary, BIC-based stepwise selection produced a reduced logistic regression model that achieves comparable predictive performance to the full model while using fewer predictors. Given its parsimony, interpretability, and stable diagnostics, the reduced model is preferred for diabetes risk prediction in this analysis.
+
+  In summary, BIC-based stepwise selection produced a reduced logistic regression model that achieves comparable predictive performance to the full model while using fewer predictors. Given its parsimony, interpretability, and stable diagnostics, the reduced model is preferred for diabetes risk prediction in this analysis.
 
 - Discussion
 
