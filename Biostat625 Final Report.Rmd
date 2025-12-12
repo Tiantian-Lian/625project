@@ -97,7 +97,7 @@ AUC:
 Full model ≈ 0.827
 Reduced model ≈ 0.827
 The ROC curves for the two models are nearly indistinguishable, indicating equivalent discriminative ability.
-![ROC curve:full vs reduced model](pic/ROC_curve_full&reduced.png){width=50%}
+![ROC curve:full vs reduced model](pic/ROC_curve_full_reduced.png){width=50%}
 
 Likelihood Ratio Test:
 A likelihood ratio test comparing the reduced model to the full model yielded a statistically significant result (p < 0.05), suggesting that the full model provides a slightly better fit in terms of deviance. However, this improvement is not reflected in predictive performance, as accuracy and AUC remain unchanged.
@@ -105,7 +105,7 @@ Given the large sample size, small differences in deviance can become statistica
 
 Diagnostic Analysis:
 Model diagnostics were conducted on the reduced (BIC-selected) model to assess adequacy and influence.
-![Deviance_residuals vs fitted_probabilities](pic/Deviance_residuals&fitted_probabilities.png){width=50%}
+![Deviance_residuals vs fitted_probabilities](pic/Deviance_residuals_fitted_probabilities.png){width=50%}
 
 Deviance residuals vs fitted probabilities showed no strong systematic pattern, suggesting an adequate model fit.
 
