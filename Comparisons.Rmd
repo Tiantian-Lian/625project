@@ -339,11 +339,11 @@ perf <- tibble(
 perf
 
 ```
-
+### Calibration plots for the three models (test set)
 
 
 ```{r}
-# Calibration plots for the three models (test set)
+
 
 calib_glm <- res_glm$calib
 calib_rf  <- res_rf$calib
