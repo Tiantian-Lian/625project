@@ -1,0 +1,437 @@
+---
+title: "Comparasion of Logistic Regression, Random Forest, and XGBoost with all predictors"
+author: "Group7"
+date: "2025-11-30"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+# install.packages("doParallel")
+# install.packages("foreach")
+library(randomForest)
+library(caret)
+library(dplyr)
+library(pROC)
+library(ggplot2)
+library(MASS)
+library(PRROC)
+
+knitr::opts_chunk$set(
+  fig.path = "figures/",  
+  fig.width = 6,
+  fig.height = 4
+)
+
+dir.create("figures", showWarnings = FALSE)
+```
+
+# 1. Data Loading and Train: Test Split for Diabetes Binary Dataset
+```{r}
+df = read.csv("diabetes_binary_5050split_health_indicators_BRFSS2015.csv")
+# summary(df)
+
+df$Diabetes_binary = factor(df$Diabetes_binary,
+                            levels = c(0,1),
+                            labels = c("NoDiabetes", "Diabetes"))
+# summary(df)
+
+set.seed(123)
+
+# 70% as train, 30% as test
+train_index = createDataPartition(df$Diabetes_binary, p = 0.70, list = FALSE)
+train_data  = df[train_index, ]
+test_data   = df[-train_index, ]
+
+n_total = nrow(df)
+cat("Training set size:", nrow(train_data), "\n")
+cat("Testing set size:", nrow(test_data), "\n")
+cat("train % =", nrow(train_data) / n_total, "\n")
+cat("test  % =", nrow(test_data) / n_total, "\n")
+
+y_test <- ifelse(test_data$Diabetes_binary == "Diabetes", 1, 0)
+```
+
+# 2. Logistic Regression
+```{r}
+# 5-fold cross-validation on training data
+
+set.seed(123)
+folds = createFolds(train_data$Diabetes_binary, k = 5, returnTrain = FALSE)
+
+cv_full   = data.frame(fold = 1:5, Accuracy = NA, AUC = NA)
+
+for (i in 1:5) {
+  idx_valid = folds[[i]]
+  cv_train  = train_data[-idx_valid, ]
+  cv_valid  = train_data[idx_valid, ]
+
+  # full model
+  fit_full = glm(
+    Diabetes_binary ~ .,
+    data   = cv_train,
+    family = binomial
+  )
+
+  prob_full = predict(fit_full, newdata = cv_valid, type = "response")
+  pred_full = ifelse(prob_full >= 0.5, "Diabetes", "NoDiabetes")
+  pred_full = factor(pred_full, levels = levels(train_data$Diabetes_binary))
+
+  cm_full   = confusionMatrix(pred_full, cv_valid$Diabetes_binary)
+  cv_full$Accuracy[i] = cm_full$overall["Accuracy"]
+
+  roc_full  = roc(as.numeric(cv_valid$Diabetes_binary == "Diabetes"), prob_full)
+  cv_full$AUC[i] = as.numeric(auc(roc_full))
+}
+
+# 5-fold CV average result
+colMeans(cv_full[, c("Accuracy", "AUC")])
+
+# fit the model on entire train_data
+
+# full model
+logit_model = glm(
+  Diabetes_binary ~ .,
+  data   = train_data,
+  family = binomial
+)
+summary(logit_model)
+
+
+# test set prediction for full model
+test_prob_full = predict(logit_model, newdata = test_data, type = "response")
+test_pred_full = ifelse(test_prob_full >= 0.5, "Diabetes", "NoDiabetes")
+test_pred_full = factor(test_pred_full, levels = levels(test_data$Diabetes_binary))
+
+cm_test_full = confusionMatrix(test_pred_full, test_data$Diabetes_binary)
+cm_test_full
+
+# ROC + AUC（test set）
+
+test_y = as.numeric(test_data$Diabetes_binary == "Diabetes")
+
+roc_full_test = roc(test_y, test_prob_full)
+auc_full_test = auc(roc_full_test)
+auc_full_test
+
+
+# plot ROC curve
+plot(roc_full_test, col = "red", main = "Logistic Regression ROC - Test Set")
+legend("bottomright",
+       legend = paste("Full model AUC =", round(auc_full_test, 3)),
+       col    = "red",
+       lwd    = 2)
+
+```
+
+# 3. Random Forest with parallel computing
+```{r}
+library(pROC)
+library(doParallel)
+library(foreach)
+
+full_formula <- Diabetes_binary ~ HighBP + HighChol + CholCheck + BMI + Smoker +
+  Stroke + HeartDiseaseorAttack + PhysActivity + Fruits + Veggies +
+  HvyAlcoholConsump + AnyHealthcare + NoDocbcCost + GenHlth +
+  MentHlth + PhysHlth + DiffWalk + Sex + Age + Education + Income
+
+set.seed(123)
+folds_rf <- createFolds(train_data$Diabetes_binary, k = 5, returnTrain = FALSE)
+
+library(parallel)
+n_cores <- max(1, detectCores() - 1)
+cl <- makeCluster(n_cores)
+registerDoParallel(cl)
+
+rf_cv_prob   <- rep(NA_real_, nrow(train_data))
+auc_folds_rf <- numeric(5)
+
+res_list <- foreach(i = 1:5,
+                    .packages = c("randomForest", "pROC")) %dopar% {
+  idx_valid <- folds_rf[[i]]
+  cv_train  <- train_data[-idx_valid, ]
+  cv_valid  <- train_data[idx_valid, ]
+  
+  rf_model <- randomForest(
+    full_formula,
+    data = cv_train,
+    ntree = 500,
+    mtry = floor(sqrt(21)), 
+    importance = TRUE
+  )
+  
+  rf_prob <- predict(rf_model, cv_valid, type = "prob")[, "Diabetes"]
+  auc_i   <- as.numeric(auc(roc(cv_valid$Diabetes_binary, rf_prob)))
+  
+  list(idx_valid = idx_valid, prob = rf_prob, auc = auc_i)
+}
+
+stopCluster(cl)
+registerDoSEQ()
+
+for (i in 1:5) {
+  rf_cv_prob[res_list[[i]]$idx_valid] <- res_list[[i]]$prob
+  auc_folds_rf[i] <- res_list[[i]]$auc
+}
+
+mean_auc_rf <- mean(auc_folds_rf)
+sd_auc_rf   <- sd(auc_folds_rf)
+mean_auc_rf; sd_auc_rf
+
+rf_final <- randomForest(
+  full_formula,
+  data = train_data,
+  ntree = 500,
+  mtry = floor(sqrt(21)),
+  importance = TRUE
+)
+
+rf_test_prob <- predict(rf_final, test_data, type = "prob")[, "Diabetes"]
+rf_test_pred <- predict(rf_final, test_data)
+rf_test_pred <- factor(rf_test_pred, levels = c("NoDiabetes", "Diabetes"))
+
+cm_rf_test <- confusionMatrix(rf_test_pred, test_data$Diabetes_binary,
+                              positive = "Diabetes")
+cm_rf_test
+
+roc_rf_test <- roc(test_data$Diabetes_binary, rf_test_prob)
+auc_rf_test <- auc(roc_rf_test)
+auc_rf_test
+
+plot(roc_rf_test, col = "blue", main = "Random Forest ROC - Test Set")
+legend("bottomright",
+       legend = paste("AUC =", round(auc_rf_test, 3)),
+       col = "blue", lwd = 2)
+
+```
+## 3.1. the system time of Random Forest with parallel computing
+```{r}
+rf_time <- system.time({
+
+  set.seed(123)
+  folds_rf <- createFolds(train_data$Diabetes_binary, k = 5, returnTrain = FALSE)
+
+  auc_folds_rf <- numeric(5)
+  rf_cv_prob   <- rep(NA_real_, nrow(train_data))
+
+  for (i in 1:5) {
+    idx_valid <- folds_rf[[i]]
+    cv_train  <- train_data[-idx_valid, ]
+    cv_valid  <- train_data[idx_valid, ]
+
+    rf_model <- randomForest(
+      full_formula,
+      data = cv_train,
+      ntree = 500,
+      mtry = floor(sqrt(21)),
+      importance = TRUE
+    )
+
+    rf_prob <- predict(rf_model, cv_valid, type = "prob")[, "Diabetes"]
+    rf_cv_prob[idx_valid] <- rf_prob
+
+    auc_folds_rf[i] <- auc(roc(cv_valid$Diabetes_binary, rf_prob))
+  }
+
+  mean_auc_rf <- mean(auc_folds_rf)
+  sd_auc_rf   <- sd(auc_folds_rf)
+
+  rf_final <- randomForest(
+    full_formula,
+    data = train_data,
+    ntree = 500,
+    mtry = floor(sqrt(21)),
+    importance = TRUE
+  )
+
+  rf_test_prob <- predict(rf_final, test_data, type = "prob")[, "Diabetes"]
+})
+rf_time
+
+```
+
+
+# 4. XGBoost with parallel computing
+```{r}
+library(xgboost)
+library(parallel)
+
+y_train <- ifelse(train_data$Diabetes_binary == "Diabetes", 1, 0)
+y_test  <- ifelse(test_data$Diabetes_binary  == "Diabetes", 1, 0)
+
+x_train <- model.matrix(Diabetes_binary ~ ., data = train_data)[, -1]
+x_test  <- model.matrix(Diabetes_binary ~ ., data = test_data)[, -1]
+
+dtrain <- xgb.DMatrix(data = x_train, label = y_train)
+dtest  <- xgb.DMatrix(data = x_test,  label = y_test)
+
+n_cores <- max(1, detectCores() - 1)
+
+params <- list(
+  objective = "binary:logistic",
+  eval_metric = "auc",
+  max_depth = 4,
+  eta = 0.05,
+  subsample = 0.8,
+  colsample_bytree = 0.8,
+  min_child_weight = 1,
+  nthread = n_cores
+)
+
+set.seed(625)
+cv <- xgb.cv(
+  params = params,
+  data = dtrain,
+  nrounds = 2000,
+  nfold = 5,
+  early_stopping_rounds = 30,
+  verbose = 0
+)
+
+best_nrounds <- cv$best_iteration
+best_nrounds
+
+# CV AUC (training set)
+cv_auc_mean <- cv$evaluation_log$test_auc_mean[best_nrounds]
+cv_auc_sd   <- cv$evaluation_log$test_auc_std[best_nrounds]
+cv_auc_mean
+cv_auc_sd
+
+# final model on full training set
+xgb_fit <- xgb.train(
+  params = params,
+  data = dtrain,
+  nrounds = best_nrounds,
+  verbose = 0
+)
+
+# test set prediction
+xgb_prob <- predict(xgb_fit, newdata = dtest) 
+
+roc_xgb_test <- roc(y_test, xgb_prob)
+auc_xgb_test <- auc(roc_xgb_test)
+auc_xgb_test
+
+plot(roc_xgb_test, col = "darkgreen", main = "XGBoost ROC - Test Set")
+legend("bottomright",
+       legend = paste("AUC =", round(auc_xgb_test, 3)),
+       col = "darkgreen", lwd = 2)
+
+```
+## 4.1. the system time of XGBoost with parallel computing
+```{r}
+xgb_time <- system.time({
+  set.seed(625)
+  cv <- xgb.cv(
+    params = params,
+    data = dtrain,
+    nrounds = 1000,
+    nfold = 5,
+    early_stopping_rounds = 30,
+    verbose = 0
+  )
+})
+xgb_time
+
+```
+
+# 5. Comparisons between Logistic Regression, Random Forst and XGBoost 
+
+## 5.1. ROC AUC、Accuracy, Sensitivity、Specificity, Brier score 
+
+```{r}
+
+y_test <- ifelse(test_data$Diabetes_binary == "Diabetes", 1, 0)
+
+# probabilities from each model (you already computed these above)
+glm_prob_test <- test_prob_full         # logistic regression
+rf_prob_test  <- rf_test_prob           # random forest
+xgb_prob_test <- xgb_prob               # XGBoost
+
+eval_binary <- function(prob, y_true01, threshold = 0.5) {
+  # ROC / AUC
+  roc_obj <- roc(response = y_true01, predictor = prob)
+  auc_roc <- as.numeric(auc(roc_obj))
+  
+  # Brier score
+  brier <- mean((prob - y_true01)^2)
+  
+  # confusion matrix metrics at given threshold
+  ref <- factor(ifelse(y_true01 == 1, "Diabetes", "NoDiabetes"),
+                levels = c("NoDiabetes", "Diabetes"))
+  pred_label <- factor(ifelse(prob >= threshold, "Diabetes", "NoDiabetes"),
+                       levels = c("NoDiabetes", "Diabetes"))
+  
+  cm <- confusionMatrix(pred_label, ref, positive = "Diabetes")
+  
+  # calibration data (10 bins)
+  calib_df <- data.frame(prob = prob, y = y_true01) |>
+    dplyr::mutate(
+      bin = cut(prob, breaks = seq(0, 1, by = 0.1), include.lowest = TRUE)
+    ) |>
+    dplyr::group_by(bin) |>
+    dplyr::summarise(
+      mean_prob = mean(prob),
+      obs_rate  = mean(y),
+      n         = dplyr::n(),
+      .groups   = "drop"
+    )
+  
+  list(
+    roc_obj = roc_obj,
+    AUC_ROC = auc_roc,
+    Brier   = brier,
+    CM      = cm,
+    calib   = calib_df
+  )
+}
+
+res_glm <- eval_binary(glm_prob_test, y_test)
+res_rf  <- eval_binary(rf_prob_test,  y_test)
+res_xgb <- eval_binary(xgb_prob_test, y_test)
+
+perf <- tibble(
+  Model       = c("Logistic regression", "Random forest", "XGBoost"),
+  AUC_ROC     = c(res_glm$AUC_ROC, res_rf$AUC_ROC, res_xgb$AUC_ROC),
+  Brier       = c(res_glm$Brier,   res_rf$Brier,   res_xgb$Brier),
+  Accuracy    = c(res_glm$CM$overall["Accuracy"],
+                  res_rf$CM$overall["Accuracy"],
+                  res_xgb$CM$overall["Accuracy"]),
+  Sensitivity = c(res_glm$CM$byClass["Sensitivity"],
+                  res_rf$CM$byClass["Sensitivity"],
+                  res_xgb$CM$byClass["Sensitivity"]),
+  Specificity = c(res_glm$CM$byClass["Specificity"],
+                  res_rf$CM$byClass["Specificity"],
+                  res_xgb$CM$byClass["Specificity"])
+)
+
+perf
+
+```
+
+## 5.2. Calibration plots for the three models (test set)
+
+```{r}
+# Calibration plots for the three models (test set)
+
+calib_glm <- res_glm$calib
+calib_rf  <- res_rf$calib
+calib_xgb <- res_xgb$calib
+
+ggplot() +
+  geom_line(data = calib_glm, aes(x = mean_prob, y = obs_rate), color = "red") +
+  geom_point(data = calib_glm, aes(x = mean_prob, y = obs_rate), color = "red") +
+  geom_line(data = calib_rf,  aes(x = mean_prob, y = obs_rate), color = "blue") +
+  geom_point(data = calib_rf, aes(x = mean_prob, y = obs_rate), color = "blue") +
+  geom_line(data = calib_xgb, aes(x = mean_prob, y = obs_rate), color = "darkgreen") +
+  geom_point(data = calib_xgb, aes(x = mean_prob, y = obs_rate), color = "darkgreen") +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed") +
+  labs(
+    title = "Calibration plots on test set",
+    x = "Mean predicted probability (bin)",
+    y = "Observed diabetes prevalence"
+  ) +
+  theme_minimal()
+
+
+```
+
