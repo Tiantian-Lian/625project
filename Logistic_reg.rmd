@@ -4,10 +4,15 @@ knitr::opts_chunk$set(echo = TRUE)
 # install.packages("tidyverse")
 # install.packages("caret")
 # install.packages("pROC")
-install.packages("future")
+# install.packages("car")
 library(tidyverse)
 library(caret)
 library(pROC)
+library(caret)
+library(dplyr)
+library(ggplot2)
+library(MASS)
+library(car)
 ```
 
 *(1)*
@@ -22,94 +27,238 @@ df$Diabetes_binary = factor(df$Diabetes_binary,
 
 set.seed(123)
 
-# 70% as train
+# 70% as train, 30% as test
 train_index = createDataPartition(df$Diabetes_binary, p = 0.70, list = FALSE)
 train_data  = df[train_index, ]
-temp_data   = df[-train_index, ]   # 剩下 30%
-
-# 剩下的 30% 分成 20% validation + 10% test
-set.seed(123)
-valid_index = createDataPartition(temp_data$Diabetes_binary, p = 2/3, list = FALSE)
-valid_data  = temp_data[valid_index, ]
-test_data   = temp_data[-valid_index, ]
+test_data   = df[-train_index, ]
 
 n_total = nrow(df)
+cat("Training set size:", nrow(train_data), "\n")
+cat("Testing set size:", nrow(test_data), "\n")
 cat("train % =", nrow(train_data) / n_total, "\n")
-cat("valid % =", nrow(valid_data) / n_total, "\n")
 cat("test  % =", nrow(test_data) / n_total, "\n")
 
-# logistic regression
+# ==========================================================================
+# Logistic Regression
+# ==========================================================================
+
+# 5-fold cross-validation on training data
+
+set.seed(123)
+folds = createFolds(train_data$Diabetes_binary, k = 5, returnTrain = FALSE)
+
+cv_full   = data.frame(fold = 1:5, Accuracy = NA, AUC = NA)
+cv_red    = data.frame(fold = 1:5, Accuracy = NA, AUC = NA)
+
+for (i in 1:5) {
+  idx_valid = folds[[i]]
+  cv_train  = train_data[-idx_valid, ]
+  cv_valid  = train_data[idx_valid, ]
+
+  # full model
+  fit_full = glm(
+    Diabetes_binary ~ .,
+    data   = cv_train,
+    family = binomial
+  )
+
+  prob_full = predict(fit_full, newdata = cv_valid, type = "response")
+  pred_full = ifelse(prob_full >= 0.5, "Diabetes", "NoDiabetes")
+  pred_full = factor(pred_full, levels = levels(train_data$Diabetes_binary))
+
+  cm_full   = confusionMatrix(pred_full, cv_valid$Diabetes_binary)
+  cv_full$Accuracy[i] = cm_full$overall["Accuracy"]
+
+  roc_full  = roc(as.numeric(cv_valid$Diabetes_binary == "Diabetes"), prob_full)
+  cv_full$AUC[i] = as.numeric(auc(roc_full))
+
+  # reduced model 
+  fit_red = glm(
+    Diabetes_binary ~ HighBP + HighChol + CholCheck + BMI +
+      Stroke + HeartDiseaseorAttack + HvyAlcoholConsump +
+      GenHlth + MentHlth + PhysHlth + DiffWalk +
+      Sex + Age + Education + Income,
+    data   = cv_train,
+    family = binomial
+  )
+
+  prob_red = predict(fit_red, newdata = cv_valid, type = "response")
+  pred_red = ifelse(prob_red >= 0.5, "Diabetes", "NoDiabetes")
+  pred_red = factor(pred_red, levels = levels(train_data$Diabetes_binary))
+
+  cm_red   = confusionMatrix(pred_red, cv_valid$Diabetes_binary)
+  cv_red$Accuracy[i] = cm_red$overall["Accuracy"]
+
+  roc_red  = roc(as.numeric(cv_valid$Diabetes_binary == "Diabetes"), prob_red)
+  cv_red$AUC[i] = as.numeric(auc(roc_red))
+}
+
+# 5-fold CV average result
+colMeans(cv_full[, c("Accuracy", "AUC")])
+colMeans(cv_red[,  c("Accuracy", "AUC")])
+
+# fit the model on entire train_data
+
+# full model
 logit_model = glm(
   Diabetes_binary ~ .,
-  data = train_data,
+  data   = train_data,
   family = binomial
 )
-
 summary(logit_model)
 
-# validation 预测
-valid_prob = predict(logit_model, newdata = valid_data, type = "response")
-valid_pred = ifelse(valid_prob >= 0.5, "Diabetes", "NoDiabetes")
-valid_pred = factor(valid_pred, levels = levels(valid_data$Diabetes_binary))
-
-confusionMatrix(valid_pred, valid_data$Diabetes_binary)
-
-# test 评估
-test_prob = predict(logit_model, newdata = test_data, type = "response")
-test_pred = ifelse(test_prob >= 0.5, "Diabetes", "NoDiabetes")
-test_pred = factor(test_pred, levels = levels(test_data$Diabetes_binary))
-
-confusionMatrix(test_pred, test_data$Diabetes_binary)
-
-# ROC + AUC
-test_y = as.numeric(test_data$Diabetes_binary == "Diabetes")
-
-roc_obj = roc(test_y, test_prob)
-auc(roc_obj)
-plot(roc_obj, main = "ROC Curve (70/20/10 Split)")
-
-# ===================================================================
-# reduced model with 15 predictors
+# reduced model
 reduced_model = glm(
   Diabetes_binary ~ HighBP + HighChol + CholCheck + BMI +
     Stroke + HeartDiseaseorAttack + HvyAlcoholConsump +
     GenHlth + MentHlth + PhysHlth + DiffWalk +
     Sex + Age + Education + Income,
-  data = train_data,
+  data   = train_data,
   family = binomial
 )
-
 summary(reduced_model)
 
-# validation prediction for reduced model
-valid_prob_r = predict(reduced_model, newdata = valid_data, type = "response")
-valid_pred_r = ifelse(valid_prob_r >= 0.5, "Diabetes", "NoDiabetes")
-valid_pred_r = factor(valid_pred_r, levels = levels(valid_data$Diabetes_binary))
+# test set prediction（full + reduced）
 
-cm_valid_reduced = confusionMatrix(valid_pred_r, valid_data$Diabetes_binary)
-cm_valid_reduced
+# full model on test
+test_prob_full = predict(logit_model, newdata = test_data, type = "response")
+test_pred_full = ifelse(test_prob_full >= 0.5, "Diabetes", "NoDiabetes")
+test_pred_full = factor(test_pred_full, levels = levels(test_data$Diabetes_binary))
 
-# test prediction for reduced model
-test_prob_r = predict(reduced_model, newdata = test_data, type = "response")
-test_pred_r = ifelse(test_prob_r >= 0.5, "Diabetes", "NoDiabetes")
-test_pred_r = factor(test_pred_r, levels = levels(test_data$Diabetes_binary))
+cm_test_full = confusionMatrix(test_pred_full, test_data$Diabetes_binary)
+cm_test_full
 
-cm_test_reduced = confusionMatrix(test_pred_r, test_data$Diabetes_binary)
-cm_test_reduced
+# reduced model on test
+test_prob_red = predict(reduced_model, newdata = test_data, type = "response")
+test_pred_red = ifelse(test_prob_red >= 0.5, "Diabetes", "NoDiabetes")
+test_pred_red = factor(test_pred_red, levels = levels(test_data$Diabetes_binary))
 
-# ROC & AUC comparison
-roc_r = roc(test_y, test_prob_r)
-auc_r = auc(roc_r)
+cm_test_red = confusionMatrix(test_pred_red, test_data$Diabetes_binary)
+cm_test_red
 
-plot(roc_r, col = "blue", main = "ROC Comparison")
-plot(roc_obj, col = "red", add = TRUE)
+# ROC + AUC（test set）
+
+test_y = as.numeric(test_data$Diabetes_binary == "Diabetes")
+
+roc_full_test = roc(test_y, test_prob_full)
+roc_red_test  = roc(test_y, test_prob_red)
+
+auc_full_test = auc(roc_full_test)
+auc_red_test  = auc(roc_red_test)
+
+auc_full_test
+auc_red_test
+
+# plot ROC curve
+plot(roc_red_test, col = "blue", main = "ROC Comparison on Test Set (70/30 Split)")
+plot(roc_full_test, col = "red", add = TRUE)
 legend("bottomright",
-       legend = c("Reduced model", "Original full model"),
-       col = c("blue", "red"),
-       lwd = 2)
-auc_r
+       legend = c("Reduced model", "Full model"),
+       col    = c("blue", "red"),
+       lwd    = 2)
 
 # Likelihood Ratio Test (Nested Model Comparison)
 anova(reduced_model, logit_model, test = "Chisq")
+
+# Additional Model Selection Metrics: PRESS, Cp, AIC, BIC
+# PRESS (Prediction Error Sum of Squares)
+calc_press = function(model) {
+  h = hatvalues(model)
+  r = residuals(model)
+  press = sum((r / (1 - h))^2)
+  return(press)
+}
+
+PRESS_full = calc_press(logit_model)
+PRESS_red  = calc_press(reduced_model)
+
+cat("PRESS (full model):", PRESS_full, "\n")
+cat("PRESS (reduced model):", PRESS_red, "\n\n")
+
+
+# Mallows' Cp (use deviance as logistic RSS)
+RSS_full = logit_model$deviance
+RSS_red  = reduced_model$deviance
+
+n  = nrow(train_data)
+
+p_full = length(coef(logit_model))
+p_red  = length(coef(reduced_model))
+
+sigma2_full = RSS_full / (n - p_full)
+
+Cp_full = RSS_full / sigma2_full - (n - 2*p_full)
+Cp_red  = RSS_red  / sigma2_full - (n - 2*p_red)
+
+cat("Cp (full model):", Cp_full, "\n")
+cat("Cp (reduced model):", Cp_red, "\n\n")
+
+
+# AIC & BIC
+AIC_full = AIC(logit_model)
+BIC_full = BIC(logit_model)
+
+AIC_red = AIC(reduced_model)
+BIC_red = BIC(reduced_model)
+
+cat("AIC (full model):", AIC_full, "\n")
+cat("AIC (reduced model):", AIC_red, "\n\n")
+
+cat("BIC (full model):", BIC_full, "\n")
+cat("BIC (reduced model):", BIC_red, "\n\n")
+```
+
+# Diagnostic
+```{r}
+# Component-plus-residual plots (logistic regression)
+par(ask = FALSE)
+crPlots(reduced_model)
+
+# Deviance residuals vs fitted probabilities
+plot(
+  reduced_model$fitted.values,
+  residuals(reduced_model, type = "deviance"),
+  xlab = "Fitted probabilities",
+  ylab = "Deviance residuals"
+)
+
+abline(h = 0, lty = 2)
+
+# Leverage（hat values）
+h = hatvalues(reduced_model)
+p = length(coef(reduced_model))
+n = nrow(train_data)
+
+idx_h = which(h > 2*p/n)
+
+length(idx_h)
+# head(idx_h, 10)
+head(order(h, decreasing = TRUE), 10)
+
+# Cook’s distance
+cook = cooks.distance(reduced_model)
+
+plot(cook, type = "h",
+     ylab = "Cook's distance",
+     xlab = "Observation index")
+
+abline(h = 4 / n, lty = 2)
+
+# DFBETAs（关键变量：BMI / Age）
+dfb = dfbetas(reduced_model)
+
+# BMI
+plot(dfb[, "BMI"], type = "h",
+     ylab = "DFBETAs for BMI",
+     xlab = "Observation index")
+abline(h =  2 / sqrt(n), lty = 2)
+abline(h = -2 / sqrt(n), lty = 2)
+
+# Age
+plot(dfb[, "Age"], type = "h",
+     ylab = "DFBETAs for Age",
+     xlab = "Observation index")
+abline(h =  2 / sqrt(n), lty = 2)
+abline(h = -2 / sqrt(n), lty = 2)
 
 ```
