@@ -51,8 +51,6 @@ y_test <- ifelse(test_data$Diabetes_binary == "Diabetes", 1, 0)
 
 # 2. Logistic Regression
 ```{r}
-# 5-fold cross-validation on training data
-
 set.seed(123)
 folds = createFolds(train_data$Diabetes_binary, k = 5, returnTrain = FALSE)
 
@@ -188,7 +186,7 @@ legend("bottomright",
 
 
 ```
-## 4. XGBoost 
+# 4. XGBoost 
 ```{r}
 library(xgboost)
 
@@ -252,12 +250,12 @@ legend("bottomright",
        col = "darkgreen", lwd = 2)
 ```
 
-## 5. Comparisons between Logistic Regression, Random Forst and XGBoost 
-### ROC AUC, Accuracy, Sensitivity, Specificity, Brier score 
+# 5. Comparisons between Logistic Regression, Random Forst and XGBoost 
+
+## 5.1. ROC AUC, Accuracy, Sensitivity, Specificity, Brier score 
 
 ```{r}
 
-# make sure we have a common 0/1 outcome on the test set
 y_test <- ifelse(test_data$Diabetes_binary == "Diabetes", 1, 0)
 
 # probabilities from each model (you already computed these above)
@@ -325,7 +323,7 @@ perf <- tibble(
 perf
 
 ```
-### Calibration plots for the three models (test set)
+## 5.2. Calibration plots for the three models (test set)
 
 
 ```{r}
