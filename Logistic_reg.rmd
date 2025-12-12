@@ -1,3 +1,9 @@
+---
+title: "Logistic_reg"
+author: "Shuchen Wu"
+date: "2025-11-30"
+output: pdf_document
+---
 *(0) Install the packages.*
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
@@ -8,14 +14,13 @@ knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(caret)
 library(pROC)
-library(caret)
 library(dplyr)
 library(ggplot2)
 library(MASS)
 library(car)
 ```
 
-*(1)*
+# Split data set
 ```{r}
 df = read.csv("diabetes_binary_5050split_health_indicators_BRFSS2015.csv")
 # summary(df)
@@ -37,11 +42,37 @@ cat("Training set size:", nrow(train_data), "\n")
 cat("Testing set size:", nrow(test_data), "\n")
 cat("train % =", nrow(train_data) / n_total, "\n")
 cat("test  % =", nrow(test_data) / n_total, "\n")
+```
 
-# ==========================================================================
-# Logistic Regression
-# ==========================================================================
+# model selection
+```{r}
+full = glm(Diabetes_binary ~ ., data = train_data, family = binomial)
+n = nrow(train_data)
+bic_step = step(full, direction = "both", k = log(n), trace = 0)
 
+formula(bic_step)
+summary(bic_step)
+
+set.seed(123)
+folds = createFolds(train_data$Diabetes_binary, k = 5, returnTrain = TRUE)
+
+vars = vector("list", 5)
+
+for(i in 1:5){
+  cv_train = train_data[folds[[i]], ]
+  fit = glm(Diabetes_binary ~ ., data = cv_train, family = binomial)
+  step_fit = step(fit, direction = "both", k = log(nrow(cv_train)), trace = 0)
+  vars[[i]] = attr(terms(step_fit), "term.labels")
+}
+
+table(unlist(vars))
+
+
+anova(bic_step, full, test="Chisq")
+```
+
+# model comparison
+```{r}
 # 5-fold cross-validation on training data
 
 set.seed(123)
@@ -72,12 +103,9 @@ for (i in 1:5) {
   roc_full  = roc(as.numeric(cv_valid$Diabetes_binary == "Diabetes"), prob_full)
   cv_full$AUC[i] = as.numeric(auc(roc_full))
 
-  # reduced model 
+  # reduced model
   fit_red = glm(
-    Diabetes_binary ~ HighBP + HighChol + CholCheck + BMI +
-      Stroke + HeartDiseaseorAttack + HvyAlcoholConsump +
-      GenHlth + MentHlth + PhysHlth + DiffWalk +
-      Sex + Age + Education + Income,
+    formula(bic_step),
     data   = cv_train,
     family = binomial
   )
@@ -105,18 +133,15 @@ logit_model = glm(
   data   = train_data,
   family = binomial
 )
-summary(logit_model)
+# summary(logit_model)
 
-# reduced model
 reduced_model = glm(
-  Diabetes_binary ~ HighBP + HighChol + CholCheck + BMI +
-    Stroke + HeartDiseaseorAttack + HvyAlcoholConsump +
-    GenHlth + MentHlth + PhysHlth + DiffWalk +
-    Sex + Age + Education + Income,
-  data   = train_data,
+  formula(bic_step),
+  data = train_data,
   family = binomial
 )
-summary(reduced_model)
+
+# summary(reduced_model)
 
 # test set prediction（full + reduced）
 
@@ -208,6 +233,7 @@ cat("BIC (full model):", BIC_full, "\n")
 cat("BIC (reduced model):", BIC_red, "\n\n")
 ```
 
+
 # Diagnostic
 ```{r}
 # Component-plus-residual plots (logistic regression)
@@ -244,7 +270,7 @@ plot(cook, type = "h",
 
 abline(h = 4 / n, lty = 2)
 
-# DFBETAs（关键变量：BMI / Age）
+# DFBETAs
 dfb = dfbetas(reduced_model)
 
 # BMI
