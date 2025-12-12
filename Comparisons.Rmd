@@ -123,7 +123,6 @@ legend("bottomright",
 ```{r}
 library(pROC)
 
-# full formula with all 21 predictors
 full_formula <- Diabetes_binary ~ HighBP + HighChol + CholCheck + BMI + Smoker +
   Stroke + HeartDiseaseorAttack + PhysActivity + Fruits + Veggies +
   HvyAlcoholConsump + AnyHealthcare + NoDocbcCost + GenHlth +
@@ -190,7 +189,6 @@ legend("bottomright",
 ```{r}
 library(xgboost)
 
-# 把 outcome 变成 0/1
 y_train <- ifelse(train_data$Diabetes_binary == "Diabetes", 1, 0)
 y_test  <- ifelse(test_data$Diabetes_binary  == "Diabetes", 1, 0)
 
@@ -238,7 +236,7 @@ xgb_fit <- xgb.train(
 )
 
 # test set prediction
-xgb_prob <- predict(xgb_fit, newdata = dtest)  # 0~1
+xgb_prob <- predict(xgb_fit, newdata = dtest) 
 
 roc_xgb_test <- roc(y_test, xgb_prob)
 auc_xgb_test <- auc(roc_xgb_test)
@@ -258,7 +256,7 @@ legend("bottomright",
 
 y_test <- ifelse(test_data$Diabetes_binary == "Diabetes", 1, 0)
 
-# probabilities from each model (you already computed these above)
+# probabilities from each model 
 glm_prob_test <- test_prob_full         # logistic regression
 rf_prob_test  <- rf_test_prob           # random forest
 xgb_prob_test <- xgb_prob               # XGBoost
@@ -327,8 +325,6 @@ perf
 
 
 ```{r}
-
-
 calib_glm <- res_glm$calib
 calib_rf  <- res_rf$calib
 calib_xgb <- res_xgb$calib
