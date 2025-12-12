@@ -185,6 +185,53 @@ legend("bottomright",
 
 
 ```
+## 3.1. the system time of Random Forest with parallel computing
+```{r}
+rf_time <- system.time({
+
+  set.seed(123)
+folds_rf <- createFolds(train_data$Diabetes_binary, k = 5, returnTrain = FALSE)
+
+auc_folds_rf <- numeric(5)
+rf_cv_prob   <- rep(NA_real_, nrow(train_data))
+
+for (i in 1:5) {
+  idx_valid <- folds_rf[[i]]
+  cv_train  <- train_data[-idx_valid, ]
+  cv_valid  <- train_data[idx_valid, ]
+
+  rf_model <- randomForest(
+    full_formula,
+    data = cv_train,
+    ntree = 500,
+    mtry = floor(sqrt(21)),  # sqrt(number of predictors)
+    importance = TRUE
+  )
+
+  rf_prob <- predict(rf_model, cv_valid, type = "prob")[, "Diabetes"]
+  rf_cv_prob[idx_valid] <- rf_prob
+
+  auc_folds_rf[i] <- auc(roc(cv_valid$Diabetes_binary, rf_prob))
+}
+
+mean_auc_rf <- mean(auc_folds_rf)
+sd_auc_rf   <- sd(auc_folds_rf)
+mean_auc_rf; sd_auc_rf
+
+# final RF on full training set
+rf_final <- randomForest(
+  full_formula,
+  data = train_data,
+  ntree = 500,
+  mtry = floor(sqrt(21)),
+  importance = TRUE
+)
+
+rf_test_prob <- predict(rf_final, test_data, type = "prob")[, "Diabetes"]
+})
+rf_time
+```
+
 # 4. XGBoost 
 ```{r}
 library(xgboost)
@@ -246,6 +293,25 @@ plot(roc_xgb_test, col = "darkgreen", main = "XGBoost ROC - Test Set")
 legend("bottomright",
        legend = paste("AUC =", round(auc_xgb_test, 3)),
        col = "darkgreen", lwd = 2)
+```
+
+## 4.1. the system time of XGBoost with parallel computing
+```{r}
+xgb_time <- system.time({
+  set.seed(625)
+  cv <- xgb.cv(
+    params = params,
+    data = dtrain,
+    nrounds = 2000,
+    nfold = 5,
+    early_stopping_rounds = 30,
+    verbose = 0
+  )
+})
+xgb_time
+
+
+
 ```
 
 # 5. Comparisons between Logistic Regression, Random Forst and XGBoost 
