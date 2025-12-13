@@ -114,6 +114,8 @@ Several limitations should be considered in our study. First, we used cross-sect
 
 Regarding methods, different models have different reproducibility. Logistic regression gives fixed results each time. But tree-based models like random forest and XGBoost include randomness during training. Even though this helps the model generalize better, results can vary a little unless we fix the random seed.
 
+Since 5-fold cross-validation for random forest and XGBoost ran quite slowly, we experimented with parallel computing. However, this did not noticeably reduce the elapsed time, likely due to the overhead of creating worker processes and copying large training subsets for each fold relative to the modest number of folds. In future work, we could explore alternative strategies to improve computational efficiency.
+
 Our study also points to useful next steps. Combining predictions from logistic regression, random forest, and XGBoost could make performance better by using the strengths of each model. Also, using data collected over time would help us move beyond association and better understand how diabetes develops. Even with these limits, our work shows that public health data can be used to build helpful models to predict diabetes and prediabetes.
 
 # References
@@ -121,10 +123,9 @@ Our study also points to useful next steps. Combining predictions from logistic 
 Teboul, A. (2022). Diabetes Health Indicators Dataset. Kaggle. https://www.kaggle.com/datasets/alexteboul/diabetes-health-indicators-dataset
 
 # Contribution
-Shuchen Wu - Logistic Regression 
 
-Tiantian Lian - XGBoost
+All team members contributed collaboratively to data analysis, model implementation, result interpretation, and report preparation, with each member taking primary responsibility for one modeling approach: Shuchen Wu for logistic regression, Tiantian Lian for XGBoost, and Meiqi Zhu for Random Forest.
 
-Meiqi Zhu - Random Forest
+# GitHub Link
 
 https://github.com/Tiantian-Lian/625project.git
