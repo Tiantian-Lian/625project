@@ -64,25 +64,23 @@ Calibration analysis revealed that all models produced well-calibrated probabili
 
 Nevertheless, the difference between AUC and ROC was not very large, but GLM had a significant advantage in terms of time efficiency and offered more feasibility for further research and analysis. Therefore, we chose GLM for more in-depth research and diagnostics to obtain a more efficient predictive model.
 
-# Conclusion Section
-
 After selecting logistic regression as our modeling approach, we performed model selection and diagnostic analyses to identify a parsimonious set of predictors and to assess the adequacy and stability of the fitted model.
 
 The full logistic regression model included all available demographic, behavioral, and health-related predictors in the BRFSS 2015 dataset. This model serves as a baseline with maximal flexibility but also the highest complexity.
 
 - Model Selection
 
-  To obtain a more parsimonious model, stepwise model selection based on the Bayesian Information Criterion (BIC) was applied. Starting from the full model, predictors were iteratively added or removed using a bidirectional search, with the penalty term “BIC penalty = log(n)” where n is the number of training observations.
+To obtain a more parsimonious model, stepwise model selection based on the Bayesian Information Criterion (BIC) was applied. Starting from the full model, predictors were iteratively added or removed using a bidirectional search, with the penalty term “BIC penalty = log(n)” where n is the number of training observations.
 The final reduced model selected by BIC retained the following predictors:
 
-  Diabetes_binary ~ HighBP + HighChol + CholCheck + BMI + Stroke + 
+Diabetes_binary ~ HighBP + HighChol + CholCheck + BMI + Stroke + 
     HeartDiseaseorAttack + HvyAlcoholConsump + GenHlth + PhysHlth + 
     DiffWalk + Sex + Age + Income
     
-  This reduced model balances interpretability and predictive performance by excluding variables that do not provide sufficient information once model complexity is penalized.
+This reduced model balances interpretability and predictive performance by excluding variables that do not provide sufficient information once model complexity is penalized.
 
-  To assess the stability of BIC-based selection, the stepwise procedure was repeated within each fold of a 5-fold cross-validation on the training data. Variables such as Age, BMI, GenHlth, HighBP, and HighChol appeared consistently across folds, indicating robust importance, while less stable variables were excluded in multiple folds.
-
+To assess the stability of BIC-based selection, the stepwise procedure was repeated within each fold of a 5-fold cross-validation on the training data. Variables such as Age, BMI, GenHlth, HighBP, and HighChol appeared consistently across folds, indicating robust importance, while less stable variables were excluded in multiple folds.
+  
 - Model Comparison
 
   - Cross-Validation Performance (Training Set): Using 5-fold cross-validation on the training data, the full and BIC-selected reduced models showed nearly identical predictive performance, with accuracy around 0.75 and AUC around 0.82 for both models. This indicates that BIC-based variable selection did not meaningfully reduce out-of-sample predictive performance.
@@ -93,11 +91,13 @@ The final reduced model selected by BIC retained the following predictors:
 
 - Diagnostic Analysis:
 
-  Model diagnostics were conducted on the reduced (BIC-selected) model to assess adequacy and influence. Deviance residuals vs fitted probabilities showed no strong systematic pattern, suggesting an adequate model fit. Leverage (hat values) identified a small number of observations with higher leverage; however, their proportion was low relative to the sample size. Cook’s distance indicated that no single observation exerted undue influence on the fitted model. DFBETAs for key predictors such as BMI and Age were examined, and no widespread instability in coefficient estimates was observed. Overall, diagnostic results indicate that the reduced logistic regression model is stable and not overly influenced by a small subset of observations.
+Model diagnostics were conducted on the reduced (BIC-selected) model to assess adequacy and influence. Deviance residuals vs fitted probabilities showed no strong systematic pattern, suggesting an adequate model fit. Leverage (hat values) identified a small number of observations with higher leverage; however, their proportion was low relative to the sample size. Cook’s distance indicated that no single observation exerted undue influence on the fitted model. DFBETAs for key predictors such as BMI and Age were examined, and no widespread instability in coefficient estimates was observed. Overall, diagnostic results indicate that the reduced logistic regression model is stable and not overly influenced by a small subset of observations.
 
-- Conclusion:
+# Conclusion Section
 
-  In summary, BIC-based stepwise selection produced a reduced logistic regression model that achieves comparable predictive performance to the full model while using fewer predictors. Given its parsimony, interpretability, and stable diagnostics, the reduced model is preferred for diabetes risk prediction in this analysis.
+- Conclusion for further analysis of Logistic Regression:
+
+In summary, BIC-based stepwise selection produced a reduced logistic regression model that achieves comparable predictive performance to the full model while using fewer predictors. Given its parsimony, interpretability, and stable diagnostics, the reduced model is preferred for diabetes risk prediction in this analysis.
 
 - Discussion
 
