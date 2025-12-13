@@ -19,10 +19,8 @@ library(PRROC)
 
 set.seed(625)
 
-# 读入数据
 dat <- read.csv("diabetes_binary_5050split_health_indicators_BRFSS2015.csv")
 
-# 把 outcome 设为 factor
 dat$Diabetes_binary <- factor(dat$Diabetes_binary,
                               levels = c(0, 1),
                               labels = c("NoDiab", "Diab"))
@@ -82,7 +80,7 @@ importance_matrix <- xgb.importance(model = xgb_fit)
 xgb.plot.importance(importance_matrix)
 
 ```
-**ROC & PR 曲线对比**
+
 ```{r}
 # ROC
 roc_glm <- roc(response = y_test, predictor = glm_prob, levels = c("NoDiab", "Diab"))
@@ -95,7 +93,7 @@ lines(roc_xgb, col = "blue")
 legend("bottomright", legend = c("Logistic", "RF", "XGBoost"),
        col = c("black", "red", "blue"), lty = 1)
 
-# PR curve（用正类=1 的分数和标签）
+
 pr_glm <- pr.curve(scores.class0 = glm_prob[y_test_num == 1],
                    scores.class1 = glm_prob[y_test_num == 0],
                    curve = TRUE)
@@ -109,7 +107,7 @@ pr_xgb <- pr.curve(scores.class0 = xgb_prob[y_test_num == 1],
 
 ```
 
-**Calibration plot（以 logistic 为例，RF/XGB 类似）**
+**Calibration plot**
 ```{r}
 calib_df <- data.frame(
   prob = glm_prob,
