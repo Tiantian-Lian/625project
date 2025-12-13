@@ -10,11 +10,12 @@ output:
 
 # Abstract
 
-Diabetes is a serious disease in the United States. Early identification of high-risk individuals is crucial for prevention. This project compared three models for predicting the risk of diabetes and prediabetes: logistic regression, random forest, and XGBoost. We used data from the 2015 BRFSS survey, which included 70,692 adults and 21 health-related questions. We split the data into two parts: 70% for training and 30% for testing. We used 5-fold cross-validation to test the stability of the models. All three models performed well. XGBoost had the highest AUC value (0.834). Logistic regression had a similar AUC value (0.827), and random forest had an AUC value of 0.824. The differences were small. Logistic regression was the easiest to understand and had the best specificity. We also built a simplified logistic regression model with fewer variables. Its performance was almost as good as the full model. Important predictors in all models included BMI, overall health status, age, and hypertension. Our study demonstrates that public health data can be helpful in predicting diabetes risk. Logistic regression is a good choice because it is easy to understand and performs well. These models can help identify high-risk individuals for targeted prevention programs.
+This project compared three models for predicting the risk of diabetes and prediabetes: logistic regression, random forest, and XGBoost. We used data from the 2015 BRFSS survey, which included 70,692 adults and 21 health-related questions. We split the data into two parts: 70% for training and 30% for testing. We used 5-fold cross-validation to test the stability of the models. All three models performed well. XGBoost had the highest AUC value (0.834). Logistic regression had a similar AUC value (0.827), and random forest had an AUC value of 0.824. The differences were small. Logistic regression was the easiest to understand and had the best specificity. We also built a simplified logistic regression model with fewer variables. Its performance was almost as good as the full model. Important predictors in all models included BMI, overall health status, age, and hypertension. Our study demonstrates that public health data can be helpful in predicting diabetes risk. Logistic regression is a good choice because it is easy to understand and performs well. These models can help identify high-risk individuals for targeted prevention programs.
 
 # Introduction Section 
 
 As the one of the most prevalent chronic diseases in the United States, diabetes is contributing to increased morbidity and healthcare costs. Although there is no cure, the progression of diabetes can often be mitigated when high risk individuals are identified before severe complications developed. Therefore, predictive models based on collected health information can be valuable tools for public health officials and prevention efforts. 
+
 The Behavioral Risk Factor Surveillance System (BRFSS), administered annually by the Centers for Disease Control and Prevention (CDC), is a health related telephone survey. For this project, we use a cleaned, balanced 2015 BRFSS dataset with 70,692 respondents, a binary outcome (no diabetes vs. prediabetes/diabetes; 50% per class), and 21 predictors. This project describes the development and comparison of logistic regression, random forest, and XGBoost models for diabetes risk prediction. It aims to assess whether or not more complex machine learning methods provide meaningful advantages over a simpler, interpretable logistic regression model in this dataset and  whether a reduced logistic regression model performs comparably to the full model selected by BIC.
 
 # Method Section
@@ -34,6 +35,10 @@ Logistic regression is a statistical method designed for predicting binary outco
 We selected logistic regression for this project because it directly models diabetes risk and provides clear, interpretable estimates of how each predictor is associated with the outcome. This interpretability makes logistic regression a useful baseline model for understanding the effects of demographic, behavioral, and health-related variables and for comparison with more flexible methods such as Random Forest and XGBoost.
 
 Although logistic regression does not automatically capture complex non-linear relationships, its simplicity leads to stable and transparent results, making it well suited as a reference model in our analysis.
+
+- Stepwise model selection (BIC)
+
+BIC is a model selection criterion that balances goodness-of-fit with model complexity by applying a stronger penalty for additional parameters; lower BIC values indicate a preferable trade-off between fit and simplicity. Starting from the full logistic regression model with all candidate predictors, we applied stepwise selection to iteratively add or remove predictors to minimize BIC.
 
 - Random Forest
 
@@ -95,13 +100,17 @@ Model diagnostics were conducted on the reduced (BIC-selected) model to assess a
 
 # Conclusion Section
 
+- Conclusion for method comparison
+
+Overall, logistic regression, random forest, and XGBoost all demonstrated strong and comparable performance in predicting diabetes risk, with only modest differences in accuracy and AUC. While XGBoost achieved the highest AUC, the improvement over logistic regression and random forest was small. Logistic regression stood out for its interpretability, computational efficiency, and stable performance, making it particularly suitable for public health applications where understanding risk factors is important. These results suggest that, for this dataset, simpler and more interpretable models can perform nearly as well as more complex machine learning methods.
+
 - Conclusion for further analysis of Logistic Regression:
 
 In summary, BIC-based stepwise selection produced a reduced logistic regression model that achieves comparable predictive performance to the full model while using fewer predictors. Given its parsimony, interpretability, and stable diagnostics, the reduced model is preferred for diabetes risk prediction in this analysis.
 
 - Discussion
 
-Several limitations should be considered in our study. First, we used cross-sectional data, which means information was collected at one time point. This design shows links between factors and diabetes, but it cannot prove cause and effect or show how risk changes over time. Second, much of the data came from participants’ self-reports about their health behaviors and conditions. This may lead to recall bias, where people do not remember or report their health details accurately. Third, we grouped prediabetes and diabetes together. Although both show higher risk, they are different stages of the disease. Combining them might hide important differences in risk patterns. It is also possible that temporary conditions like gestational diabetes were included.
+Several limitations should be considered in our study. First, we used cross-sectional data, which means information was collected at one time point. This design shows links between factors and diabetes, but it cannot prove cause and effect or show how risk changes over time. Second, much of the data came from participants’ self-reports about their health behaviors and conditions. This may lead to recall bias, where people do not remember or report their health details accurately. Third, we grouped prediabetes and diabetes together. Although both show higher risk, they are different stages of the disease. Combining them might hide important differences in risk patterns. It is also possible that temporary conditions like gestational diabetes were included. Fourth, due to dataset limitations, some potentially important predictors were not available or not included in our analysis, such as family history of diabetes and other clinical or genetic risk factors. Omitting these variables may limit predictive performance and contribute to residual confounding.
 
 Regarding methods, different models have different reproducibility. Logistic regression gives fixed results each time. But tree-based models like random forest and XGBoost include randomness during training. Even though this helps the model generalize better, results can vary a little unless we fix the random seed.
 
