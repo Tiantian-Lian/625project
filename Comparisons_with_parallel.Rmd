@@ -324,7 +324,7 @@ xgb_time <- system.time({
   cv <- xgb.cv(
     params = params,
     data = dtrain,
-    nrounds = 1000,
+    nrounds = 2000,
     nfold = 5,
     early_stopping_rounds = 30,
     verbose = 0
