@@ -7,19 +7,20 @@ This project compares three machine learning models (Logistic Regression, Random
   
 Biostat625 Final Report.Rmd - Main report document
 
-Logistic_reg.rmd - Logistic regression analysis
+Logistic_reg.rmd - Logistic regression analysis, including model selection, diagnostics, and key outputs used in the final report.
 
-Random_Forest_full.Rmd - Random forest analysis
+Random_Forest_full.Rmd - Random forest analysis 
 
 XGBoost.Rmd - XGBoost analysis
 
-Comparisons.Rmd - Model comparison code and figures
+Comparisons.Rmd - Model comparison across Logistic Regression, Random Forest, and XGBoost using the full predictor set.
+Generates comparison figures and summary metrics.
 
-Comparisons_with_parallel.Rmd - Parallel processing version (XGBoost and Random Forest)
+Comparisons_with_parallel.Rmd - Parallelized version of the comparison pipeline (primarily for Random Forest and XGBoost)
 
-Final.Rmd - Analysis with 5-fold CV
+Final.Rmd - Draft / working version of Comparisons.Rmd
 
-pic/ - Folder for all figures and plots
+pic/ - Folder containing all exported figures and plots used in the report.
 
 625project_git.Rproj - RStudio project file
 
