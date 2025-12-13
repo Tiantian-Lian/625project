@@ -8,8 +8,9 @@ output:
     latex_engine: xelatex
 ---
 
-# Abstract/Summary
+# Abstract
 
+Diabetes is a serious disease in the United States. Early identification of high-risk individuals is crucial for prevention. This project compared three models for predicting the risk of diabetes and prediabetes: logistic regression, random forest, and XGBoost. We used data from the 2015 BRFSS survey, which included 70,692 adults and 21 health-related questions. We split the data into two parts: 70% for training and 30% for testing. We used 5-fold cross-validation to test the stability of the models. All three models performed well. XGBoost had the highest AUC value (0.834). Logistic regression had a similar AUC value (0.827), and random forest had an AUC value of 0.824. The differences were small. Logistic regression was the easiest to understand and had the best specificity. We also built a simplified logistic regression model with fewer variables. Its performance was almost as good as the full model. Important predictors in all models included BMI, overall health status, age, and hypertension. Our study demonstrates that public health data can be helpful in predicting diabetes risk. Logistic regression is a good choice because it is easy to understand and performs well. These models can help identify high-risk individuals for targeted prevention programs.
 
 # Introduction Section 
 
@@ -46,19 +47,26 @@ Its randomness is useful for two main reasons. First, it helps make sure every t
 
 - XGboost
 
-- 比较：
-- Workflow: 选出 Logistic Regression， 然后做model selection 减少predictors，再和原来的Logistic Regression full model比较
-- 遇到什么问题：Rcpp and parallel解决或者画图app？
+As the one of the most prevalent chronic diseases in the United States, diabetes is contributing to increased morbidity and healthcare costs. Although there is no cure, the progression of diabetes can often be mitigated when high risk individuals are identified before severe complications developed. Therefore, predictive models based on collected health information can be valuable tools for public health officials and prevention efforts.
+
+The Behavioral Risk Factor Surveillance System (BRFSS), administered annually by the Centers for Disease Control and Prevention (CDC), is a health-related telephone survey. For this project, we use a cleaned, balanced 2015 BRFSS dataset with 70,692 respondents, a binary outcome (no diabetes vs. prediabetes/diabetes; 50% per class), and 21 predictors. This project describes the development and comparison of logistic regression, random forest, and XGBoost models for diabetes risk prediction. It aims to assess whether or not more complex machine learning methods provide meaningful advantages over a simpler, interpretable logistic regression model in this dataset.
+
+XGBoost is a tree-based ensemble learning method that builds a strong predictor by sequentially adding many shallow decision trees. Unlike Random Forest, which builds trees independently and averages their predictions, XGBoost trains each new tree to correct the errors made by the current set of trees. This boosting strategy, combined with gradient-based optimization and built-in regularization, often yields high predictive accuracy while controlling overfitting. We selected XGBoost because it can flexibly capture complex non-linear relationships and interactions among predictors, which may be missed by a standard logistic regression model, even though the overall model is less directly interpretable than logistic regression.
 
 # Result Section
+![1](pic/096a1ada606bd14f85b184ff8a1d81f5.png){width=33%}
+![2](pic/31b9e6f4f0c536a74b5219e810a22355 - Copy.png){width=33%}
+![3](pic/94ae6d6e11c9a440f94f3fee4a8e75e0 - Copy.png){width=33%}
 
-- Performance Comparison:
-  - Logistic Regression: AUC ≈ 0.827  
-  - Random Forest: AUC ≈ 0.822  
-  - XGBoost: AUC ≈ 0.831 
-- Reduced Model:
+The ROC curves for each model visually confirm these findings. XGBoost showed the highest overall discriminative ability, with its curve positioned slightly above the others across most of the specificity range. All three models demonstrated strong classification performance, with AUC values exceeding 0.82.
 
-Variable Importance:
+![4](pic/Screenshot 2025-12-12 164921.png){width=70%}
+
+The performance of all three models on the test set is summarized in Table. XGBoost achieved the highest overall predictive performance with an AUC-ROC of 0.834, accuracy of 0.758, and sensitivity of 0.804. Logistic regression showed the highest specificity (0.727), indicating it was best at correctly identifying individuals without diabetes. Random forest performed comparably to the other models with an AUC-ROC of 0.824 and accuracy of 0.750.
+
+![5](pic/101fcf8fdaf9a2aea0c16e22f7c0dbb2.png){width=50%}
+
+Calibration analysis (Figure 2) revealed that all models produced well-calibrated probability estimates. The predicted probabilities closely aligned with observed event rates across the risk spectrum, with XGBoost showing slightly better calibration in the mid-to-high risk range. This indicates that the predicted probabilities from our models are reliable and could be meaningfully interpreted in clinical settings.
 
 
 # Conclusion Section
@@ -101,31 +109,15 @@ Several limitations should be considered in our study. First, we used cross-sect
 
 Regarding methods, different models have different reproducibility. Logistic regression gives fixed results each time. But tree-based models like random forest and XGBoost include randomness during training. Even though this helps the model generalize better, results can vary a little unless we fix the random seed.
 
-Our study also points to useful next steps. Combining predictions from logistic regression, random forest, and XGBoost could make performance better by using the strengths of each model. Also, using data collected over time would help us move beyond association and better understand how diabetes develops.
-
-Even with these limits, our work shows that public health data can be used to build helpful models to predict diabetes and prediabetes.
+Our study also points to useful next steps. Combining predictions from logistic regression, random forest, and XGBoost could make performance better by using the strengths of each model. Also, using data collected over time would help us move beyond association and better understand how diabetes develops. Even with these limits, our work shows that public health data can be used to build helpful models to predict diabetes and prediabetes.
 
 # References
 
-National Institute of Diabetes and Digestive and Kidney Diseases (NIDDK). (2016). Risk factors for type 2 diabetes. U.S.
-Department of Health and Human Services.
-https://www.niddk.nih.gov/health-information/diabetes/overview/risk-factors-type-2-diabetes
-Abdullah, A., Peeters, A., de Courten, M., & Stoelwinder, J. (2010). The magnitude of association between overweight and
-obesity and the risk of diabetes: a meta-analysis of prospective cohort studies. Diabetes research and clinical practice, 89(3),
-309–319. https://doi.org/10.1016/j.diabres.2010.04.012
-Gress, T. W., Nieto, F. J., Shahar, E., Wofford, M. R., & Brancati, F. L. (2000). Hypertension and antihypertensive therapy as risk
-factors for type 2 diabetes mellitus. Atherosclerosis Risk in Communities Study. The New England journal of medicine, 342(13),
-905–912. https://doi.org/10.1056/NEJM200003303421301
-Lipscombe, L. L., Austin, P. C., Manuel, D. G., Shah, B. R., Hux, J. E., & Booth, G. L. (2010). Income-related differences in
-mortality among people with diabetes mellitus. CMAJ : Canadian Medical Association journal = journal de l'Association medicale
-canadienne, 182(1), E1–E17. https://doi.org/10.1503/cmaj.090495
-Stringhini, S., Sabia, S., Shipley, M., Brunner, E., Nabi, H., Kivimaki, M., & Singh-Manoux, A. (2010). Association of
-socioeconomic position with health behaviors and mortality. JAMA, 303(12), 1159–1166. https://doi.org/10.1001/jama.2010.297
-Cornier, M.-A., Donahoo, W. T., Gurgevich, J. E., et al. (2008). The metabolic syndrome.
-https://pages.ucsd.edu/~mboyle/COGS163/pdf-files/The-Metabolic-Syndrome-Cornier-Endocrine-Reviews-2008.pdf
+Teboul, A. (2022). Diabetes Health Indicators Dataset. Kaggle. https://www.kaggle.com/datasets/alexteboul/diabetes-health-indicators-dataset
 
- The contributions from each of the group member should be clearly stated (although all the
-students in a group will receive equal points for the final group project).
- A public GitHub repository should be used for the group members to collaborate on the final
-project, with a link to it provided in the report.
- Graphics (ideally with ggplot2) should be used to present the results
+# Contribution
+Shuchen Wu - Logistic Regression 
+
+Tiantian Lian - XGBoost
+
+Meiqi Zhu - Random Forest
