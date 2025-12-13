@@ -119,4 +119,8 @@ Tiantian Lian - XGBoost
 
 Meiqi Zhu - Random Forest
 
+<<<<<<< HEAD
 https://github.com/Tiantian-Lian/625project.git
+=======
+https://github.com/Tiantian-Lian/625project.git
+>>>>>>> 83d22aa2d5ca7ac4788006141b3feefabb2ceaa3
