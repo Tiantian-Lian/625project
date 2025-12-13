@@ -1,5 +1,5 @@
 ---
-title: "Comparasion of Logistic Regression, Random Forest, and XGBoost with all predictors"
+title: "Comparison of Logistic Regression, Random Forest, and XGBoost with all predictors"
 author: "Group7"
 date: "2025-11-30"
 output: pdf_document
